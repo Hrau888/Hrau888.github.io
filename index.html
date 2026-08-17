@@ -1,0 +1,2152 @@
+<title>チップ台帳</title>
+<style>
+  :root {
+    --bg: #172420;
+    --bg-weave: #15211d;
+    --surface: #1e2b27;
+    --surface-2: #26352f;
+    --surface-3: #2e3f38;
+    --border: #3a4a43;
+    --border-soft: #2c3a34;
+    --text: #e5e0d3;
+    --text-dim: #98a69d;
+    --text-faint: #6f7b74;
+    --accent: #bfa06d;
+    --accent-strong: #d3b686;
+    --accent-ink: #231a0c;
+    --negative: #b06a63;
+    --negative-soft: #33231f;
+    --pos-d: #9fa470;
+    --pos-sb: #a58bb1;
+    --pos-bb: #7da375;
+    --act-check: #6d9aba;
+    --act-call: #53a274;
+    --radius-panel: 14px;
+    --radius-control: 8px;
+    --font-ui: "Hiragino Sans", "Yu Gothic", "YuGothic", "Noto Sans JP", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, #223530 0%, transparent 60%),
+      repeating-linear-gradient(45deg, var(--bg-weave) 0px, var(--bg-weave) 2px, var(--bg) 2px, var(--bg) 4px),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 5.5rem; /* room for sticky action bar */
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .chip-btn, .stepper button, .card, .panel, button { transition: transform .12s ease, background-color .15s ease, border-color .15s ease, opacity .15s ease; }
+    .card.acting { animation: pulse-border 1.6s ease-in-out infinite; }
+  }
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(191,160,109,.22); }
+    50% { box-shadow: 0 0 0 4px rgba(191,160,109,.06); }
+  }
+
+  button {
+    font-family: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  input {
+    font-family: inherit;
+    color: inherit;
+    background: transparent;
+    border: none;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 3rem;
+  }
+
+  /* ---------- Header / ledger bar ---------- */
+
+  header {
+    background: linear-gradient(180deg, var(--surface) 0%, var(--surface) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    padding: 1.4rem 1.6rem 1.2rem;
+    box-shadow: 0 20px 40px -24px rgba(0,0,0,.6);
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 .5rem;
+  }
+
+  .title-row {
+    display: flex;
+    align-items: baseline;
+    gap: .9rem;
+    flex-wrap: wrap;
+  }
+
+  .title-input {
+    font-size: clamp(1.5rem, 3vw, 2.1rem);
+    font-weight: 700;
+    letter-spacing: .01em;
+    text-wrap: balance;
+    padding: .1rem .2rem;
+    border-radius: 6px;
+    min-width: 8ch;
+    flex: 1 1 auto;
+  }
+  .title-input:hover, .title-input:focus-visible { background: var(--surface-2); }
+
+  .seat-count {
+    font-family: var(--font-mono);
+    font-size: .82rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--border-soft);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+    margin-top: 1.1rem;
+  }
+  .stat {
+    background: var(--surface-2);
+    padding: .7rem .9rem;
+  }
+  .stat-label {
+    font-size: .68rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 .25rem;
+  }
+  .stat-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+  .stat-value.warn { color: var(--negative); }
+  .stat-value.ok { color: var(--accent); }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem;
+    margin-top: 1.2rem;
+  }
+
+  .btn {
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    border-radius: var(--radius-control);
+    padding: .55rem 1rem;
+    font-size: .85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+  }
+  .btn:hover { background: var(--surface-3); border-color: var(--text-faint); }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+  .btn.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+  .btn.ghost { background: transparent; }
+  .btn.danger:hover { border-color: var(--negative); color: var(--negative); }
+  .btn[disabled] { opacity: .4; cursor: not-allowed; }
+  .btn[disabled]:hover { background: var(--surface-2); border-color: var(--border); }
+  .btn.sm { padding: .4rem .75rem; font-size: .78rem; }
+
+  /* ---------- Settings panel ---------- */
+
+  .panel {
+    margin-top: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    padding: 1.3rem 1.5rem;
+  }
+  .panel h2 {
+    font-size: .95rem;
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    margin-bottom: .9rem;
+    flex-wrap: wrap;
+  }
+  .field-row label {
+    font-size: .82rem;
+    color: var(--text-dim);
+    min-width: 9rem;
+  }
+  .field-row input[type="number"], .field-row input[type="text"] {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .4rem .6rem;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    width: 8rem;
+  }
+  .field-note {
+    font-size: .74rem;
+    color: var(--text-faint);
+    margin: -.5rem 0 1rem;
+  }
+
+  .denom-table {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    margin-top: .3rem;
+  }
+  .denom-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: .7rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-control);
+    padding: .5rem .6rem;
+  }
+  .denom-row input[type="color"] {
+    width: 2.1rem;
+    height: 2.1rem;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    padding: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .denom-row input[type="text"] {
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: .35rem .5rem;
+  }
+  .denom-row input[type="number"] {
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: .35rem .5rem;
+    width: 6.5rem;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-faint);
+    font-size: 1rem;
+  }
+  .icon-btn:hover { color: var(--negative); border-color: var(--negative); }
+
+  /* ---------- Chip disc ---------- */
+
+  .chip {
+    --chip-color: #ccc;
+    width: 34px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    flex: none;
+    background:
+      radial-gradient(circle at 50% 50%, var(--chip-color) 0 60%, transparent 61%),
+      repeating-conic-gradient(from 0deg, #fff9 0deg 11deg, transparent 11deg 30deg);
+    border: 2px solid color-mix(in srgb, var(--chip-color) 55%, #000 45%);
+    box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--chip-color) 70%, #000 30%);
+  }
+  .chip.sm { width: 22px; }
+
+  /* ---------- Hand panel ---------- */
+
+  .hand-panel {
+    margin-top: 1rem;
+    background: linear-gradient(180deg, var(--surface-2), var(--surface));
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-panel);
+    padding: 1.1rem 1.4rem;
+  }
+  .hand-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .8rem;
+  }
+  .street-badge {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: .25rem .7rem;
+  }
+  .pot-display {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent-strong);
+  }
+  .pot-display .lbl {
+    font-family: var(--font-ui);
+    font-size: .68rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 600;
+    display: block;
+  }
+  .hand-meta {
+    display: flex;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+    font-size: .82rem;
+    color: var(--text-dim);
+  }
+  .hand-meta b { color: var(--text); }
+  .hand-log {
+    margin-top: .8rem;
+    max-height: 6.5rem;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: .76rem;
+    color: var(--text-dim);
+    border-top: 1px dashed var(--border-soft);
+    padding-top: .6rem;
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+  }
+  .hand-log .divider { color: var(--accent); letter-spacing: .1em; margin: .2rem 0; }
+
+  .hand-start-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .8rem;
+  }
+  .hand-start-note { font-size: .82rem; color: var(--text-dim); }
+
+  /* ---------- Player grid ---------- */
+
+  .players {
+    margin-top: 1.4rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left-width: 4px;
+    border-radius: var(--radius-panel);
+    padding: 1.1rem 1.2rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: .8rem;
+    position: relative;
+  }
+  .card.folded { opacity: .45; }
+  .card.acting { border-color: var(--accent); }
+  .card.allin { border-color: var(--negative); }
+
+  .card-head {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+  }
+  /* Seat badge: neutral by default. It only turns accent-gold — the one
+     color reserved for "must act now" — while it's this player's turn. */
+  .seat-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1.5px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: .78rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+  .card.acting .seat-badge {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+  }
+  /* Player identity: a small fixed-hue dot, paired with the card's left
+     border stripe (same color) — separate from position and turn colors. */
+  .player-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: none;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.25);
+  }
+  /* Position tags: each of D/SB/BB gets its own hue, outlined (not filled)
+     so they stay quieter than the turn-accent glow and the player-identity
+     dots — distinguishable from each other without competing for attention. */
+  .pos-badges {
+    display: flex;
+    gap: .3rem;
+    flex: none;
+  }
+  .pos-badge {
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+    border-radius: 5px;
+    padding: .12rem .35rem;
+    line-height: 1.5;
+    background: var(--surface-3);
+    border: 1px solid currentColor;
+  }
+  .pos-badge.d { color: var(--pos-d); }
+  .pos-badge.sb { color: var(--pos-sb); }
+  .pos-badge.bb { color: var(--pos-bb); }
+  .name-input {
+    font-size: 1.05rem;
+    font-weight: 700;
+    flex: 1;
+    padding: .15rem .3rem;
+    border-radius: 6px;
+    min-width: 4ch;
+  }
+  .name-input:hover, .name-input:focus-visible { background: var(--surface-2); }
+
+  .status-line {
+    font-family: var(--font-mono);
+    font-size: .74rem;
+    letter-spacing: .04em;
+    padding: .3rem .6rem;
+    border-radius: var(--radius-control);
+    display: flex;
+    justify-content: space-between;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+  }
+  .status-line.folded-tag { color: var(--text-faint); }
+  .status-line.allin-tag { color: var(--negative); border-color: color-mix(in srgb, var(--negative) 40%, transparent); }
+  .status-line.acting-tag { color: var(--accent); border-color: var(--accent); }
+
+  .buyin-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: .6rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-control);
+    padding: .5rem .7rem;
+  }
+  .buyin-row .lbl { font-size: .78rem; color: var(--text-dim); }
+  .buyin-row .amt {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: .95rem;
+    text-align: right;
+  }
+
+  details.chip-detail { font-size: .82rem; }
+  details.chip-detail summary {
+    cursor: pointer;
+    color: var(--text-faint);
+    font-size: .76rem;
+    letter-spacing: .04em;
+    padding: .2rem 0;
+    list-style: none;
+  }
+  details.chip-detail summary::-webkit-details-marker { display: none; }
+  details.chip-detail summary::before { content: "▸ "; }
+  details.chip-detail[open] summary::before { content: "▾ "; }
+
+  .chips-list {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    max-height: 12rem;
+    overflow-y: auto;
+    padding: .5rem 2px 0;
+  }
+  .chip-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: .55rem;
+  }
+  .chip-row .lbl { font-size: .82rem; color: var(--text-dim); }
+  .chip-row .sub {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: .82rem;
+    color: var(--text-faint);
+    min-width: 5.5ch;
+    text-align: right;
+  }
+  .sync-row { display: flex; justify-content: flex-end; margin-top: .4rem; }
+
+  .stepper {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .stepper button {
+    background: var(--surface-2);
+    border: none;
+    width: 1.7rem;
+    height: 1.7rem;
+    font-size: .95rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .stepper button:hover { background: var(--surface-3); color: var(--accent); }
+  .stepper .count {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: .82rem;
+    width: 2.1rem;
+    text-align: center;
+  }
+
+  .card-foot {
+    margin-top: auto;
+    padding-top: .7rem;
+    border-top: 1px dashed var(--border-soft);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .foot-block .lbl { font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin: 0 0 .15rem; }
+  .foot-block .val {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+  .val.positive { color: var(--accent); }
+  .val.negative { color: var(--negative); }
+
+  .remove-player { align-self: flex-start; }
+
+  .empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-faint);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-panel);
+  }
+  .empty-state .chip { margin: 0 auto 1rem; width: 44px; }
+
+  /* ---------- Overlays (settle / showdown) ---------- */
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 18, 15, .72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    z-index: 30;
+  }
+  .overlay[hidden] { display: none; }
+
+  .receipt {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    width: min(520px, 100%);
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 1.5rem 1.6rem;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,.7);
+  }
+  .receipt-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  .receipt-head h2 { margin: 0; font-size: 1.15rem; }
+  .close-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 2rem;
+    height: 2rem;
+    font-size: .95rem;
+    color: var(--text-dim);
+  }
+  .close-btn:hover { border-color: var(--negative); color: var(--negative); }
+
+  .mismatch-banner {
+    background: var(--negative-soft);
+    border: 1px solid color-mix(in srgb, var(--negative) 50%, transparent);
+    color: var(--text);
+    border-radius: var(--radius-control);
+    padding: .7rem .9rem;
+    font-size: .82rem;
+    margin-bottom: 1rem;
+  }
+
+  .transfer-list { display: flex; flex-direction: column; gap: .55rem; }
+  .transfer {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto;
+    align-items: center;
+    gap: .5rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-control);
+    padding: .6rem .8rem;
+    font-size: .88rem;
+  }
+  .transfer .who { font-weight: 600; }
+  .transfer .who.from { text-align: right; color: var(--negative); }
+  .transfer .who.to { color: var(--accent); }
+  .transfer .arrow { color: var(--text-faint); font-family: var(--font-mono); }
+  .transfer .amt {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .settled-note { text-align: center; padding: 2rem 0; color: var(--text-dim); }
+
+  .pot-block {
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-control);
+    padding: .9rem 1rem;
+    margin-bottom: 1rem;
+    background: var(--surface-2);
+  }
+  .pot-block h3 {
+    margin: 0 0 .3rem;
+    font-size: .9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .pot-block h3 .amt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--accent-strong); }
+  .pot-block .eligible-note { font-size: .74rem; color: var(--text-faint); margin: 0 0 .6rem; }
+  .winner-picks { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .7rem; }
+  .winner-pick {
+    border: 1px solid var(--border);
+    background: var(--surface-3);
+    border-radius: 999px;
+    padding: .35rem .8rem;
+    font-size: .82rem;
+    color: var(--text-dim);
+  }
+  .winner-pick.selected { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-3)); }
+  .pot-resolved { font-size: .82rem; color: var(--accent); }
+
+  .win-banner {
+    background: var(--surface-2);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-control);
+    padding: .8rem 1rem;
+    margin-bottom: 1rem;
+    font-size: .9rem;
+  }
+
+  footer.hint {
+    margin-top: 1.4rem;
+    text-align: center;
+    font-size: .74rem;
+    color: var(--text-faint);
+  }
+
+  /* ---------- Sticky action bar ---------- */
+
+  .action-bar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--accent);
+    padding: .8rem 1rem calc(.8rem + env(safe-area-inset-bottom));
+    z-index: 25;
+    box-shadow: 0 -12px 30px -18px rgba(0,0,0,.8);
+  }
+  .action-bar[hidden] { display: none; }
+  .action-bar-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    flex-wrap: wrap;
+  }
+  .action-bar-who {
+    font-weight: 700;
+    font-size: .92rem;
+    white-space: nowrap;
+  }
+  .action-bar-who .to-call {
+    display: block;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: .74rem;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  .action-bar-buttons {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+  .action-bar-buttons .btn { flex: 1 1 auto; justify-content: center; min-width: 5.5rem; }
+  /* Each action keeps its own color so the three buttons read apart at a
+     glance: fold = danger red, check/call = blue/green, bet-raise = accent
+     (matching the primary-button treatment used for the emphasized action). */
+  .btn.fold { border-color: var(--negative); color: var(--negative); }
+  .btn.fold:hover { background: color-mix(in srgb, var(--negative) 16%, var(--surface-2)); }
+  .btn.check { border-color: var(--act-check); color: var(--act-check); }
+  .btn.check:hover { background: color-mix(in srgb, var(--act-check) 16%, var(--surface-2)); }
+  .btn.call { border-color: var(--act-call); color: var(--act-call); }
+  .btn.call:hover { background: color-mix(in srgb, var(--act-call) 16%, var(--surface-2)); }
+
+  .raise-panel {
+    width: 100%;
+    margin-top: .7rem;
+    padding-top: .7rem;
+    border-top: 1px dashed var(--border-soft);
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+  }
+  .raise-panel[hidden] { display: none; }
+  .preset-buttons { display: flex; gap: .4rem; flex-wrap: wrap; }
+
+  .raise-slider-row {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+  }
+  .raise-slider-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 1.4rem;
+  }
+  .raise-slider-end {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: .72rem;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  .raise-amount-display {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--accent-strong);
+  }
+
+  @media (max-width: 640px) {
+    .action-bar-buttons .btn { min-width: 4.4rem; padding: .55rem .5rem; font-size: .78rem; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Home Game Ledger</p>
+    <div class="title-row">
+      <input id="titleInput" class="title-input" type="text" value="チップ台帳" aria-label="ゲーム名" />
+      <span class="seat-count" id="seatCount">0 名着席</span>
+    </div>
+
+    <div class="stat-strip">
+      <div class="stat">
+        <p class="stat-label">総バイイン</p>
+        <p class="stat-value" id="statBuyin">¥0</p>
+      </div>
+      <div class="stat">
+        <p class="stat-label">卓上合計（スタック＋ポット）</p>
+        <p class="stat-value" id="statChips">¥0</p>
+      </div>
+      <div class="stat">
+        <p class="stat-label">差額</p>
+        <p class="stat-value" id="statDiff">¥0</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="addPlayerBtn">＋ 参加者を追加</button>
+      <button class="btn" id="toggleSettingsBtn">卓の設定</button>
+      <button class="btn" id="settleBtn">精算する</button>
+      <button class="btn ghost danger" id="resetBtn">リセット</button>
+    </div>
+  </header>
+
+  <section class="panel" id="settingsPanel" hidden>
+    <h2>卓の設定</h2>
+    <div class="field-row">
+      <label for="currencyInput">通貨記号</label>
+      <input id="currencyInput" type="text" maxlength="3" value="¥" />
+    </div>
+    <div class="field-row">
+      <label for="buyinUnitInput">1回のバイイン額</label>
+      <input id="buyinUnitInput" type="number" min="0" step="100" value="1000" />
+    </div>
+    <div class="field-row">
+      <label for="sbInput">スモールブラインド</label>
+      <input id="sbInput" type="number" min="0" step="10" value="50" />
+    </div>
+    <div class="field-row">
+      <label for="bbInput">ビッグブラインド</label>
+      <input id="bbInput" type="number" min="0" step="10" value="100" />
+    </div>
+    <div class="field-row">
+      <label for="anteInput">BBアンティ</label>
+      <input id="anteInput" type="number" min="0" step="10" value="100" />
+    </div>
+    <p class="field-note">ボタン・SB・BBは自動でローテーションし、BB がブラインドに加えてアンティを一括で支払います（進行中のハンドには反映されません）。</p>
+
+    <h2 style="margin-top:1.3rem;">チップ構成（実数確認用）</h2>
+    <div class="denom-table" id="denomTable"></div>
+    <button class="btn" id="addDenomBtn" style="margin-top:.8rem;">＋ チップを追加</button>
+  </section>
+
+  <section class="hand-panel" id="handPanel" hidden>
+    <div class="hand-top">
+      <div>
+        <span class="street-badge" id="streetBadge">プリフロップ</span>
+      </div>
+      <div class="pot-display">
+        <span class="lbl">ポット</span>
+        <span id="potAmount">¥0</span>
+      </div>
+    </div>
+    <div class="hand-meta">
+      <span>ボタン: <b id="metaDealer">—</b></span>
+      <span>SB: <b id="metaSb">—</b></span>
+      <span>BB: <b id="metaBb">—</b></span>
+      <span>コール額: <b id="metaToCall">¥0</b></span>
+    </div>
+    <div class="hand-log" id="handLog"></div>
+    <div class="actions" style="margin-top:.9rem;">
+      <button class="btn ghost danger sm" id="abortHandBtn">ハンドを中止（掛け金を返却）</button>
+      <button class="btn primary sm" id="reopenShowdownBtn" hidden>結果・分配画面を開く</button>
+    </div>
+  </section>
+
+  <section class="hand-panel" id="startHandPanel">
+    <div class="hand-start-row">
+      <p class="hand-start-note" id="startHandNote">2名以上（スタック有り）で「ハンドを開始」できます。</p>
+      <button class="btn primary" id="startHandBtn">ハンドを開始</button>
+    </div>
+  </section>
+
+  <section class="players" id="players"></section>
+
+  <footer class="hint">データはこのブラウザにのみ保存されます。他の端末とは共有されません。</footer>
+</div>
+
+<div class="action-bar" id="actionBar" hidden>
+  <div class="action-bar-inner">
+    <div class="action-bar-who">
+      <span id="actingName">—</span>
+      <span class="to-call" id="actingToCall"></span>
+    </div>
+    <div class="action-bar-buttons">
+      <button class="btn fold" id="foldBtn">フォールド</button>
+      <button class="btn check" id="checkCallBtn">チェック</button>
+      <button class="btn primary" id="openRaiseBtn">ベット・レイズ</button>
+    </div>
+    <div class="raise-panel" id="raisePanel" hidden>
+      <div class="preset-buttons" id="raisePresets"></div>
+      <div class="raise-slider-row">
+        <span class="raise-slider-end" id="raiseMinLabel">¥0</span>
+        <input type="range" id="raiseAmountInput" step="10" />
+        <span class="raise-slider-end" id="raiseMaxLabel">¥0</span>
+      </div>
+      <div class="raise-amount-display" id="raiseAmountDisplay">¥0</div>
+      <div class="actions">
+        <button class="btn primary sm" id="confirmRaiseBtn">確定</button>
+        <button class="btn ghost sm" id="cancelRaiseBtn">キャンセル</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="settleOverlay" hidden>
+  <div class="receipt" role="dialog" aria-modal="true" aria-labelledby="receiptTitle">
+    <div class="receipt-head">
+      <h2 id="receiptTitle">精算</h2>
+      <button class="close-btn" id="closeSettleBtn" aria-label="閉じる">✕</button>
+    </div>
+    <div id="mismatchBanner"></div>
+    <div id="transferArea"></div>
+  </div>
+</div>
+
+<div class="overlay" id="showdownOverlay" hidden>
+  <div class="receipt" role="dialog" aria-modal="true" aria-labelledby="showdownTitle">
+    <div class="receipt-head">
+      <h2 id="showdownTitle">ショーダウン</h2>
+      <button class="close-btn" id="closeShowdownBtn" aria-label="閉じる">✕</button>
+    </div>
+    <div id="winBanner"></div>
+    <div id="potsArea"></div>
+    <div id="nextHandRow" style="margin-top:.5rem;" hidden>
+      <p class="field-note" style="margin:0 0 .6rem; text-align:center;">まもなく次のハンドが自動的に始まります…</p>
+      <div class="actions">
+        <button class="btn primary" id="nextHandBtn" style="width:100%; justify-content:center;">今すぐ次のハンドへ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "chip-ledger-v2";
+
+  var defaultState = {
+    title: "チップ台帳",
+    currency: "¥",
+    buyinUnit: 1000,
+    blinds: { sb: 50, bb: 100, ante: 100 },
+    denoms: [
+      { id: "d1", label: "100", value: 100, color: "#f1ece0" },
+      { id: "d2", label: "500", value: 500, color: "#c1433f" },
+      { id: "d3", label: "1000", value: 1000, color: "#2f6fa8" },
+      { id: "d4", label: "5000", value: 5000, color: "#3f8f5c" },
+      { id: "d5", label: "10000", value: 10000, color: "#262626" }
+    ],
+    players: [],
+    dealerId: null,
+    hand: null,
+    nextColorIndex: 0
+  };
+
+  // Per-player identity color: a fixed-order categorical set (never cycled,
+  // never reused) so each player's card is recognizable at a glance, kept
+  // separate from the position tags (neutral) and the turn highlight (accent).
+  // Beyond 8 seated players an identity color is simply not assigned rather
+  // than reusing one — a 9th+ player falls back to the neutral border.
+  var PLAYER_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return clone(defaultState);
+      var parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.denoms) || !Array.isArray(parsed.players)) {
+        return clone(defaultState);
+      }
+      if (!parsed.blinds) parsed.blinds = clone(defaultState.blinds);
+      if (parsed.dealerId === undefined) parsed.dealerId = null;
+      if (parsed.hand === undefined) parsed.hand = null;
+      if (typeof parsed.nextColorIndex !== "number") parsed.nextColorIndex = 0;
+      // Migrate saves from before buyinTotal existed: best-effort backfill
+      // using the buy-in amount on record (exact unless it's since changed).
+      var unit = typeof parsed.buyinUnit === "number" ? parsed.buyinUnit : defaultState.buyinUnit;
+      parsed.players.forEach(function (p) {
+        if (typeof p.buyinTotal !== "number") p.buyinTotal = (p.buyins || 0) * unit;
+      });
+      return parsed;
+    } catch (e) {
+      return clone(defaultState);
+    }
+  }
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
+  }
+
+  var state = loadState();
+  var uidCounter = 1;
+  function uid(prefix) { return prefix + "_" + (Date.now().toString(36)) + "_" + (uidCounter++); }
+
+  var AUTO_NEXT_HAND_DELAY = 1800;
+  var autoNextHandTimer = null;
+
+  // renderPlayers() rebuilds every player card from scratch on every state
+  // change, which would otherwise slam shut each player's <details> chip
+  // breakdown the instant its own stepper is clicked. Track open/closed
+  // per player id here (UI-only, not persisted) and restore it after rebuild.
+  var openChipDetailIds = {};
+
+  function fmt(n) {
+    var sign = n < 0 ? "-" : "";
+    return sign + state.currency + Math.abs(Math.round(n)).toLocaleString("ja-JP");
+  }
+
+  function getPlayer(id) {
+    for (var i = 0; i < state.players.length; i++) if (state.players[i].id === id) return state.players[i];
+    return null;
+  }
+
+  // ---------- derived values ----------
+
+  // p.buyinTotal is the actual yen paid in across all buy-ins, accumulated at
+  // whatever buyinUnit was in effect at each click. It must NOT be recomputed
+  // as buyins-count × the current buyinUnit — changing the buy-in amount
+  // mid-session would then silently rewrite the cost of every earlier buy-in.
+  function playerBuyinTotal(p) { return p.buyinTotal || 0; }
+
+  function playerChipTotal(p) {
+    var total = 0;
+    state.denoms.forEach(function (d) { total += (p.chips[d.id] || 0) * d.value; });
+    return total;
+  }
+
+  // The gross amount ever committed to the pot this hand. Note this does NOT
+  // shrink as winners get paid — players' totalContributed is kept as a fixed
+  // historical record (computeSidePots needs it), so once any money has been
+  // distributed, use potRemaining() instead wherever "what's still live" is
+  // what's actually being displayed — otherwise paid-out chips get counted
+  // twice (once in the winner's stack, once still here).
+  function potTotal() {
+    if (!state.hand) return 0;
+    var total = 0;
+    Object.keys(state.hand.players).forEach(function (id) { total += state.hand.players[id].totalContributed; });
+    return total;
+  }
+
+  // What's still sitting in the pot, not yet paid to a winner.
+  function potRemaining() {
+    var h = state.hand;
+    if (!h) return 0;
+    var total = potTotal();
+    if (!h.resolved) return total;
+    if (h.resolved.fold) return 0; // uncontested win pays out the whole pot immediately
+    var paid = h.resolved.pots
+      .filter(function (pot) { return pot.resolved; })
+      .reduce(function (s, pot) { return s + pot.amount; }, 0);
+    return Math.max(0, total - paid);
+  }
+
+  function tableTotals() {
+    var buyin = 0, stacks = 0;
+    state.players.forEach(function (p) {
+      buyin += playerBuyinTotal(p);
+      stacks += p.stack;
+    });
+    var pot = potRemaining();
+    return { buyin: buyin, onTable: stacks + pot, diff: (stacks + pot) - buyin };
+  }
+
+  function computeSettlement() {
+    var nets = state.players.map(function (p) {
+      return { name: p.name || "無名", net: p.stack - playerBuyinTotal(p) };
+    }).filter(function (n) { return n.net !== 0; });
+
+    var creditors = nets.filter(function (n) { return n.net > 0; })
+      .sort(function (a, b) { return b.net - a.net; })
+      .map(function (n) { return { name: n.name, amt: n.net }; });
+    var debtors = nets.filter(function (n) { return n.net < 0; })
+      .sort(function (a, b) { return a.net - b.net; })
+      .map(function (n) { return { name: n.name, amt: -n.net }; });
+
+    var transfers = [];
+    var i = 0, j = 0;
+    while (i < debtors.length && j < creditors.length) {
+      var pay = Math.min(debtors[i].amt, creditors[j].amt);
+      if (pay > 0) transfers.push({ from: debtors[i].name, to: creditors[j].name, amount: pay });
+      debtors[i].amt -= pay;
+      creditors[j].amt -= pay;
+      if (debtors[i].amt <= 0.0001) i++;
+      if (creditors[j].amt <= 0.0001) j++;
+    }
+    return transfers;
+  }
+
+  // ---------- hand engine ----------
+
+  function log(msg) {
+    if (!state.hand) return;
+    state.hand.log.push(msg);
+    if (state.hand.log.length > 60) state.hand.log.shift();
+  }
+
+  function orderStartingAt(playerId) {
+    var idx = state.players.findIndex(function (p) { return p.id === playerId; });
+    if (idx === -1) return state.players.slice();
+    return state.players.slice(idx).concat(state.players.slice(0, idx));
+  }
+
+  function canStartHand() {
+    return state.players.filter(function (p) { return p.stack > 0; }).length >= 2;
+  }
+
+  function startHand() {
+    if (!canStartHand() || state.hand) return;
+
+    var eligibleAll = state.players.filter(function (p) { return p.stack > 0; });
+    var newDealer;
+    if (!state.dealerId || !getPlayer(state.dealerId)) {
+      newDealer = eligibleAll[0];
+    } else {
+      var afterOld = orderStartingAt(state.dealerId).slice(1).filter(function (p) { return p.stack > 0; });
+      newDealer = afterOld.length ? afterOld[0] : eligibleAll[0];
+    }
+
+    var participants = orderStartingAt(newDealer.id).filter(function (p) { return p.stack > 0; });
+    var sb = participants.length === 2 ? participants[0] : participants[1];
+    var bb = participants.length === 2 ? participants[1] : participants[2];
+
+    var bbIdx = participants.indexOf(bb);
+    var preflopOrderIds = participants.slice(bbIdx + 1).concat(participants.slice(0, bbIdx + 1)).map(function (p) { return p.id; });
+    var postflopOrderIds = participants.slice(1).concat(participants.slice(0, 1)).map(function (p) { return p.id; });
+
+    var handPlayers = {};
+    participants.forEach(function (p) {
+      handPlayers[p.id] = { inHand: true, allIn: false, betStreet: 0, totalContributed: 0 };
+    });
+
+    state.dealerId = newDealer.id;
+    state.hand = {
+      street: "preflop",
+      currentBet: 0,
+      minRaise: state.blinds.bb,
+      bbUnit: state.blinds.bb,
+      dealerId: newDealer.id,
+      sbId: sb.id,
+      bbId: bb.id,
+      preflopOrderIds: preflopOrderIds,
+      postflopOrderIds: postflopOrderIds,
+      queue: [],
+      players: handPlayers,
+      log: [],
+      resolved: null // { pots: [{amount, eligibleIds, winners, resolved}], fold: {winnerId} }
+    };
+
+    log((participants.length === 2 ? "ヘッズアップ" : "新しいハンド") + " — ボタン: " + newDealer.name);
+
+    postBlind(sb.id, state.blinds.sb, "SB");
+    postBlind(bb.id, state.blinds.bb, "BB");
+    if (state.blinds.ante > 0) postAnte(bb.id, state.blinds.ante);
+
+    state.hand.currentBet = handPlayers[bb.id].betStreet;
+    state.hand.minRaise = state.blinds.bb;
+
+    startStreetBetting(preflopOrderIds);
+    saveState();
+    renderAll();
+  }
+
+  function postBlind(playerId, amount, label) {
+    var pl = getPlayer(playerId);
+    var hp = state.hand.players[playerId];
+    var pay = Math.min(amount, pl.stack);
+    pl.stack -= pay;
+    hp.betStreet += pay;
+    hp.totalContributed += pay;
+    if (pl.stack === 0) hp.allIn = true;
+    log(pl.name + " が" + label + " " + fmt(pay) + (pay < amount ? "（オールイン）" : "") + " を投稿");
+  }
+
+  function postAnte(playerId, amount) {
+    var pl = getPlayer(playerId);
+    var hp = state.hand.players[playerId];
+    var pay = Math.min(amount, pl.stack);
+    pl.stack -= pay;
+    hp.totalContributed += pay; // ante is dead money, not part of betStreet-to-call
+    if (pl.stack === 0) hp.allIn = true;
+    if (pay > 0) log(pl.name + " がBBアンティ " + fmt(pay) + (pay < amount ? "（オールイン）" : "") + " を投稿");
+  }
+
+  function inHandIds() {
+    return Object.keys(state.hand.players).filter(function (id) { return state.hand.players[id].inHand; });
+  }
+
+  function startStreetBetting(baseOrderIds) {
+    var h = state.hand;
+    h.streetBaseOrder = baseOrderIds;
+    h.queue = baseOrderIds.filter(function (id) { return h.players[id].inHand && !h.players[id].allIn; });
+
+    var remaining = inHandIds();
+    if (remaining.length === 1) {
+      awardUncontested(remaining[0]);
+      return;
+    }
+    if (h.queue.length <= 1) {
+      // At most one player can still act (everyone else is all-in or folded) —
+      // no betting is possible this street, so run it straight through.
+      advanceStreet();
+    }
+    // otherwise wait for action; queue[0] is up next
+  }
+
+  // Call after every action. Unlike startStreetBetting's shortcut above, this
+  // must only advance once the queue is fully empty — a queue of exactly one
+  // still means that one player (e.g. the BB preflop, the button postflop)
+  // has not acted yet and must not be skipped.
+  function resolveStreetOrAdvance() {
+    var h = state.hand;
+    var remaining = inHandIds();
+
+    if (remaining.length === 1) {
+      awardUncontested(remaining[0]);
+      return;
+    }
+
+    if (h.queue.length === 0) {
+      advanceStreet();
+      return;
+    }
+    // otherwise wait for action; queue[0] is up next
+  }
+
+  function advanceStreet() {
+    var h = state.hand;
+    var order = { preflop: "flop", flop: "turn", turn: "river", river: "showdown" };
+    var next = order[h.street];
+
+    Object.keys(h.players).forEach(function (id) { h.players[id].betStreet = 0; });
+    h.currentBet = 0;
+    h.minRaise = h.bbUnit;
+
+    if (next === "showdown") {
+      goToShowdown();
+      return;
+    }
+
+    h.street = next;
+    log("— " + streetLabel(next) + " —");
+    startStreetBetting(h.postflopOrderIds);
+  }
+
+  function streetLabel(s) {
+    return { preflop: "プリフロップ", flop: "フロップ", turn: "ターン", river: "リバー", showdown: "ショーダウン" }[s] || s;
+  }
+
+  function act(playerId, action, amount) {
+    var h = state.hand;
+    if (!h || h.queue[0] !== playerId) return;
+    var pl = getPlayer(playerId);
+    var hp = h.players[playerId];
+    var isRaise = false;
+
+    if (action === "fold") {
+      hp.inHand = false;
+      log(pl.name + " がフォールド");
+    } else if (action === "check") {
+      if (hp.betStreet !== h.currentBet) return;
+      log(pl.name + " がチェック");
+    } else if (action === "call") {
+      var need = h.currentBet - hp.betStreet;
+      var pay = Math.min(need, pl.stack);
+      pl.stack -= pay;
+      hp.betStreet += pay;
+      hp.totalContributed += pay;
+      if (pl.stack === 0) hp.allIn = true;
+      log(pl.name + " がコール " + fmt(pay) + (hp.allIn ? "（オールイン）" : ""));
+    } else if (action === "bet") {
+      var target = Math.max(hp.betStreet, Math.min(amount, hp.betStreet + pl.stack));
+      var delta = target - hp.betStreet;
+      pl.stack -= delta;
+      hp.betStreet = target;
+      hp.totalContributed += delta;
+      if (pl.stack === 0) hp.allIn = true;
+      if (target > h.currentBet) {
+        isRaise = true;
+        h.minRaise = Math.max(h.bbUnit, target - h.currentBet);
+        h.currentBet = target;
+        log(pl.name + " がベット・レイズ " + fmt(target) + (hp.allIn ? "（オールイン）" : ""));
+      } else {
+        log(pl.name + " がコール " + fmt(delta) + (hp.allIn ? "（オールイン）" : ""));
+      }
+    }
+
+    if (isRaise) {
+      var startIdx = h.streetBaseOrder.indexOf(playerId);
+      var rotated = h.streetBaseOrder.slice(startIdx + 1).concat(h.streetBaseOrder.slice(0, startIdx + 1));
+      h.queue = rotated.filter(function (id) {
+        return id !== playerId && h.players[id].inHand && !h.players[id].allIn;
+      });
+    } else {
+      h.queue.shift();
+    }
+
+    resolveStreetOrAdvance();
+    saveState();
+    renderAll();
+  }
+
+  function awardUncontested(winnerId) {
+    var h = state.hand;
+    var amount = potTotal();
+    var winner = getPlayer(winnerId);
+    winner.stack += amount;
+    log(winner.name + " が勝ち残り、ポット " + fmt(amount) + " を獲得");
+    h.resolved = { fold: { winnerId: winnerId, amount: amount }, pots: [] };
+    h.queue = [];
+    saveState();
+    renderAll();
+    openShowdown();
+  }
+
+  // A side pot only needs to exist where a short stack's all-in actually
+  // caps how much can be contested. A plain fold never creates a new tier
+  // by itself — that player's money just flows into whichever pot(s) their
+  // contribution spans, without them being eligible for any of it. So tier
+  // boundaries come only from players who are actually all-in; every other
+  // contribution level (folds included) is folded into those tiers instead
+  // of spawning its own pot.
+  function computeSidePots() {
+    var h = state.hand;
+    var all = Object.keys(h.players).map(function (id) {
+      return { id: id, amount: h.players[id].totalContributed, inHand: h.players[id].inHand, allIn: h.players[id].allIn };
+    }).filter(function (c) { return c.amount > 0; });
+
+    if (all.length === 0) return [];
+
+    var maxTotal = all.reduce(function (m, c) { return Math.max(m, c.amount); }, 0);
+    var boundaries = Array.from(new Set(
+      all.filter(function (c) { return c.allIn; }).map(function (c) { return c.amount; }).concat([maxTotal])
+    )).sort(function (a, b) { return a - b; });
+
+    var pots = [];
+    var prev = 0;
+    boundaries.forEach(function (level) {
+      var amount = 0;
+      all.forEach(function (c) { amount += Math.max(0, Math.min(c.amount, level) - prev); });
+      var eligibleIds = all.filter(function (c) { return c.inHand && c.amount >= level; }).map(function (c) { return c.id; });
+      if (amount > 0 && eligibleIds.length > 0) {
+        pots.push({ amount: amount, eligibleIds: eligibleIds, winners: [], resolved: false });
+      } else if (amount > 0 && pots.length) {
+        // dead money edge case: nobody eligible reached this tier, merge into the previous pot
+        pots[pots.length - 1].amount += amount;
+      }
+      prev = level;
+    });
+    return pots;
+  }
+
+  function goToShowdown() {
+    var h = state.hand;
+    h.street = "showdown";
+    h.queue = [];
+    h.resolved = { fold: null, pots: computeSidePots() };
+    log("— ショーダウン —");
+    saveState();
+    renderAll();
+    openShowdown();
+  }
+
+  function abortHand() {
+    if (!state.hand || state.hand.resolved) return; // outcome already paid out — nothing to safely undo
+    cancelAutoNextHand();
+    var h = state.hand;
+    Object.keys(h.players).forEach(function (id) {
+      var pl = getPlayer(id);
+      if (pl) pl.stack += h.players[id].totalContributed;
+    });
+    state.hand = null;
+    saveState();
+    renderAll();
+  }
+
+  function endHandAndReset() {
+    state.hand = null;
+    saveState();
+    renderAll();
+  }
+
+  // Once a hand's pot(s) are fully distributed, the next hand starts on its
+  // own after a short pause so players can see who won before the table
+  // resets. The pause is skipped if the user taps "次のハンドへ" themselves.
+  function cancelAutoNextHand() {
+    if (autoNextHandTimer) { clearTimeout(autoNextHandTimer); autoNextHandTimer = null; }
+  }
+
+  function triggerNextHand() {
+    cancelAutoNextHand();
+    els.showdownOverlay.hidden = true;
+    endHandAndReset();
+    startHand();
+  }
+
+  function scheduleAutoNextHand() {
+    cancelAutoNextHand();
+    autoNextHandTimer = setTimeout(function () {
+      autoNextHandTimer = null;
+      triggerNextHand();
+    }, AUTO_NEXT_HAND_DELAY);
+  }
+
+  // ---------- rendering ----------
+
+  var els = {
+    titleInput: document.getElementById("titleInput"),
+    seatCount: document.getElementById("seatCount"),
+    statBuyin: document.getElementById("statBuyin"),
+    statChips: document.getElementById("statChips"),
+    statDiff: document.getElementById("statDiff"),
+    settingsPanel: document.getElementById("settingsPanel"),
+    currencyInput: document.getElementById("currencyInput"),
+    buyinUnitInput: document.getElementById("buyinUnitInput"),
+    sbInput: document.getElementById("sbInput"),
+    bbInput: document.getElementById("bbInput"),
+    anteInput: document.getElementById("anteInput"),
+    denomTable: document.getElementById("denomTable"),
+    players: document.getElementById("players"),
+    settleOverlay: document.getElementById("settleOverlay"),
+    mismatchBanner: document.getElementById("mismatchBanner"),
+    transferArea: document.getElementById("transferArea"),
+    handPanel: document.getElementById("handPanel"),
+    startHandPanel: document.getElementById("startHandPanel"),
+    startHandNote: document.getElementById("startHandNote"),
+    startHandBtn: document.getElementById("startHandBtn"),
+    streetBadge: document.getElementById("streetBadge"),
+    potAmount: document.getElementById("potAmount"),
+    metaDealer: document.getElementById("metaDealer"),
+    metaSb: document.getElementById("metaSb"),
+    metaBb: document.getElementById("metaBb"),
+    metaToCall: document.getElementById("metaToCall"),
+    handLog: document.getElementById("handLog"),
+    abortHandBtn: document.getElementById("abortHandBtn"),
+    reopenShowdownBtn: document.getElementById("reopenShowdownBtn"),
+    actionBar: document.getElementById("actionBar"),
+    actingName: document.getElementById("actingName"),
+    actingToCall: document.getElementById("actingToCall"),
+    foldBtn: document.getElementById("foldBtn"),
+    checkCallBtn: document.getElementById("checkCallBtn"),
+    openRaiseBtn: document.getElementById("openRaiseBtn"),
+    raisePanel: document.getElementById("raisePanel"),
+    raiseAmountInput: document.getElementById("raiseAmountInput"),
+    raiseAmountDisplay: document.getElementById("raiseAmountDisplay"),
+    raiseMinLabel: document.getElementById("raiseMinLabel"),
+    raiseMaxLabel: document.getElementById("raiseMaxLabel"),
+    raisePresets: document.getElementById("raisePresets"),
+    confirmRaiseBtn: document.getElementById("confirmRaiseBtn"),
+    showdownOverlay: document.getElementById("showdownOverlay"),
+    winBanner: document.getElementById("winBanner"),
+    potsArea: document.getElementById("potsArea"),
+    nextHandRow: document.getElementById("nextHandRow")
+  };
+
+  function renderHeader() {
+    els.titleInput.value = state.title;
+    els.currencyInput.value = state.currency;
+    els.buyinUnitInput.value = state.buyinUnit;
+    els.sbInput.value = state.blinds.sb;
+    els.bbInput.value = state.blinds.bb;
+    els.anteInput.value = state.blinds.ante;
+    els.seatCount.textContent = state.players.length + " 名着席";
+
+    var t = tableTotals();
+    els.statBuyin.textContent = fmt(t.buyin);
+    els.statChips.textContent = fmt(t.onTable);
+    els.statDiff.textContent = fmt(t.diff);
+    els.statDiff.className = "stat-value " + (t.diff === 0 ? "ok" : "warn");
+  }
+
+  function renderDenomTable() {
+    els.denomTable.innerHTML = "";
+    state.denoms.forEach(function (d) {
+      var row = document.createElement("div");
+      row.className = "denom-row";
+
+      var color = document.createElement("input");
+      color.type = "color";
+      color.value = d.color;
+      color.setAttribute("aria-label", "チップの色");
+      color.addEventListener("input", function () { d.color = color.value; saveState(); renderPlayers(); });
+
+      var label = document.createElement("input");
+      label.type = "text";
+      label.value = d.label;
+      label.setAttribute("aria-label", "チップの名称");
+      label.addEventListener("input", function () { d.label = label.value; saveState(); renderPlayers(); });
+
+      var value = document.createElement("input");
+      value.type = "number";
+      value.min = "0";
+      value.step = "10";
+      value.value = d.value;
+      value.setAttribute("aria-label", "チップの価値");
+      value.addEventListener("input", function () { d.value = Math.max(0, Number(value.value) || 0); saveState(); renderPlayers(); });
+
+      var del = document.createElement("button");
+      del.className = "icon-btn";
+      del.innerHTML = "✕";
+      del.title = "このチップを削除";
+      del.addEventListener("click", function () {
+        state.denoms = state.denoms.filter(function (x) { return x.id !== d.id; });
+        state.players.forEach(function (p) { delete p.chips[d.id]; });
+        saveState();
+        renderAll();
+      });
+
+      row.appendChild(color);
+      row.appendChild(label);
+      row.appendChild(value);
+      row.appendChild(del);
+      els.denomTable.appendChild(row);
+    });
+  }
+
+  function makeChipDisc(color, size) {
+    var c = document.createElement("span");
+    c.className = "chip" + (size === "sm" ? " sm" : "");
+    c.style.setProperty("--chip-color", color);
+    c.setAttribute("aria-hidden", "true");
+    return c;
+  }
+
+  function makeStepper(count, onChange) {
+    var wrap = document.createElement("div");
+    wrap.className = "stepper";
+    var minus = document.createElement("button");
+    minus.type = "button";
+    minus.textContent = "−";
+    minus.setAttribute("aria-label", "減らす");
+    minus.addEventListener("click", function () { onChange(Math.max(0, count - 1)); });
+    var span = document.createElement("span");
+    span.className = "count";
+    span.textContent = count;
+    var plus = document.createElement("button");
+    plus.type = "button";
+    plus.textContent = "＋";
+    plus.setAttribute("aria-label", "増やす");
+    plus.addEventListener("click", function () { onChange(count + 1); });
+    wrap.appendChild(minus);
+    wrap.appendChild(span);
+    wrap.appendChild(plus);
+    return wrap;
+  }
+
+  function renderHandPanel() {
+    var h = state.hand;
+    els.handPanel.hidden = !h;
+    els.startHandPanel.hidden = !!h;
+
+    if (!h) {
+      var ok = canStartHand();
+      els.startHandBtn.disabled = !ok;
+      els.startHandNote.textContent = ok
+        ? "「ハンドを開始」でボタン・SB/BBを自動配置します。"
+        : "2名以上（スタック有り）で「ハンドを開始」できます。";
+      els.actionBar.hidden = true;
+      return;
+    }
+
+    els.streetBadge.textContent = streetLabel(h.street);
+    els.potAmount.textContent = fmt(potRemaining());
+    els.metaDealer.textContent = getPlayer(h.dealerId) ? getPlayer(h.dealerId).name : "—";
+    els.metaSb.textContent = getPlayer(h.sbId) ? getPlayer(h.sbId).name : "—";
+    els.metaBb.textContent = getPlayer(h.bbId) ? getPlayer(h.bbId).name : "—";
+    var actingId = h.queue[0];
+    var actingHp = actingId ? h.players[actingId] : null;
+    els.metaToCall.textContent = actingHp ? fmt(Math.max(0, h.currentBet - actingHp.betStreet)) : fmt(0);
+
+    els.handLog.innerHTML = "";
+    h.log.slice(-14).forEach(function (line) {
+      var p = document.createElement("div");
+      if (line.indexOf("—") === 0) p.className = "divider";
+      p.textContent = line;
+      els.handLog.appendChild(p);
+    });
+    els.handLog.scrollTop = els.handLog.scrollHeight;
+
+    // Once a hand has reached its outcome, aborting no longer makes sense
+    // (money may already be paid out) — offer to reopen the result screen
+    // instead, in case the × was used to dismiss it early.
+    els.abortHandBtn.hidden = !!h.resolved;
+    els.reopenShowdownBtn.hidden = !h.resolved;
+
+    renderActionBar();
+  }
+
+  function renderActionBar() {
+    var h = state.hand;
+    closeRaisePanel(); // never let it carry over from the previous player's turn
+    if (!h || !h.queue[0] || h.resolved) {
+      els.actionBar.hidden = true;
+      return;
+    }
+    var actingId = h.queue[0];
+    var pl = getPlayer(actingId);
+    var hp = h.players[actingId];
+    var toCall = Math.max(0, h.currentBet - hp.betStreet);
+
+    var callIsAllIn = toCall > 0 && pl.stack <= toCall;
+
+    els.actionBar.hidden = false;
+    els.actingName.textContent = pl.name + " の番";
+    els.actingToCall.textContent = "スタック " + fmt(pl.stack) + (toCall > 0 ? " ／ コール " + fmt(toCall) : "");
+
+    els.checkCallBtn.className = "btn " + (toCall > 0 ? "call" : "check");
+    els.checkCallBtn.textContent = toCall > 0 ? (callIsAllIn ? "オールイン " + fmt(pl.stack) : "コール " + fmt(toCall)) : "チェック";
+    els.checkCallBtn.onclick = function () { act(actingId, toCall > 0 ? "call" : "check"); };
+    els.foldBtn.onclick = function () { act(actingId, "fold"); };
+
+    var minRaiseTo = h.currentBet + h.minRaise;
+    var maxRaiseTo = hp.betStreet + pl.stack;
+    els.openRaiseBtn.disabled = maxRaiseTo <= h.currentBet; // can only call/all-in for less
+    els.openRaiseBtn.onclick = function () {
+      els.raisePanel.hidden = false;
+      var lo = Math.min(minRaiseTo, maxRaiseTo);
+      els.raiseAmountInput.min = lo;
+      els.raiseAmountInput.max = maxRaiseTo;
+      els.raiseMinLabel.textContent = fmt(lo);
+      els.raiseMaxLabel.textContent = "オールイン " + fmt(maxRaiseTo);
+      els.raiseAmountInput.oninput = function () { setRaiseAmount(Number(els.raiseAmountInput.value) || lo); };
+      setRaiseAmount(lo);
+      renderRaisePresets(minRaiseTo, maxRaiseTo);
+    };
+
+    els.confirmRaiseBtn.onclick = function () {
+      var val = Number(els.raiseAmountInput.value) || 0;
+      // maxRaiseTo (the player's actual stack) always wins — a short stack
+      // can be below the legal min-raise, and that must still cap the amount.
+      val = Math.min(maxRaiseTo, Math.max(minRaiseTo, val));
+      act(actingId, "bet", val);
+      closeRaisePanel();
+    };
+  }
+
+  function setRaiseAmount(v) {
+    els.raiseAmountInput.value = v;
+    els.raiseAmountDisplay.textContent = fmt(v);
+  }
+
+  // Four pot-fraction presets cover the common sizings; anything else —
+  // including pot-over bets and all-in — is reached via the slider, which
+  // spans the full legal range from the minimum raise up to the player's stack.
+  function renderRaisePresets(minRaiseTo, maxRaiseTo) {
+    var h = state.hand;
+    var pot = potTotal();
+    var fractions = [
+      { label: "1/3 ポット", frac: 1 / 3 },
+      { label: "1/2 ポット", frac: 1 / 2 },
+      { label: "2/3 ポット", frac: 2 / 3 },
+      { label: "ポット (1倍)", frac: 1 }
+    ];
+    els.raisePresets.innerHTML = "";
+    fractions.forEach(function (p) {
+      var target = h.currentBet + Math.round(pot * p.frac);
+      var v = Math.min(maxRaiseTo, Math.max(minRaiseTo, target));
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn sm";
+      b.textContent = p.label + " " + fmt(v);
+      b.addEventListener("click", function () { setRaiseAmount(v); });
+      els.raisePresets.appendChild(b);
+    });
+  }
+
+  function closeRaisePanel() { els.raisePanel.hidden = true; }
+
+  function renderPlayers() {
+    els.players.innerHTML = "";
+    var h = state.hand;
+
+    if (state.players.length === 0) {
+      var empty = document.createElement("div");
+      empty.className = "empty-state";
+      var chip = makeChipDisc("#c1433f");
+      chip.style.width = "44px";
+      empty.appendChild(chip);
+      var p1 = document.createElement("p");
+      p1.textContent = "まだ参加者がいません。「参加者を追加」で卓を始めましょう。";
+      empty.appendChild(p1);
+      els.players.appendChild(empty);
+      return;
+    }
+
+    state.players.forEach(function (p, idx) {
+      var hp = h ? h.players[p.id] : null;
+      var card = document.createElement("div");
+      card.className = "card";
+      if (p.color) card.style.borderLeftColor = p.color;
+      if (hp && !hp.inHand) card.classList.add("folded");
+      if (hp && hp.allIn) card.classList.add("allin");
+      if (h && h.queue[0] === p.id) card.classList.add("acting");
+
+      // head
+      var head = document.createElement("div");
+      head.className = "card-head";
+      var badge = document.createElement("div");
+      badge.className = "seat-badge";
+      badge.textContent = idx + 1;
+      head.appendChild(badge);
+
+      if (h) {
+        var posWrap = document.createElement("div");
+        posWrap.className = "pos-badges";
+        if (h.dealerId === p.id) { var d = document.createElement("span"); d.className = "pos-badge d"; d.textContent = "D"; posWrap.appendChild(d); }
+        if (h.sbId === p.id) { var sbb = document.createElement("span"); sbb.className = "pos-badge sb"; sbb.textContent = "SB"; posWrap.appendChild(sbb); }
+        if (h.bbId === p.id) { var bbb = document.createElement("span"); bbb.className = "pos-badge bb"; bbb.textContent = "BB"; posWrap.appendChild(bbb); }
+        head.appendChild(posWrap);
+      }
+
+      if (p.color) {
+        var dot = document.createElement("span");
+        dot.className = "player-dot";
+        dot.style.background = p.color;
+        dot.setAttribute("aria-hidden", "true");
+        head.appendChild(dot);
+      }
+
+      var nameInput = document.createElement("input");
+      nameInput.className = "name-input";
+      nameInput.type = "text";
+      nameInput.value = p.name;
+      nameInput.placeholder = "名前";
+      nameInput.addEventListener("input", function () { p.name = nameInput.value; saveState(); });
+      head.appendChild(nameInput);
+      card.appendChild(head);
+
+      if (hp) {
+        var statusLine = document.createElement("div");
+        var statusText, statusClass;
+        if (!hp.inHand) { statusText = "フォールド"; statusClass = "folded-tag"; }
+        else if (hp.allIn) { statusText = "オールイン"; statusClass = "allin-tag"; }
+        else if (h.queue[0] === p.id) { statusText = "手番"; statusClass = "acting-tag"; }
+        else { statusText = "待機中"; statusClass = ""; }
+        statusLine.className = "status-line " + statusClass;
+        var stLeft = document.createElement("span");
+        stLeft.textContent = statusText;
+        var stRight = document.createElement("span");
+        stRight.textContent = "このストリート " + fmt(hp.betStreet);
+        statusLine.appendChild(stLeft);
+        statusLine.appendChild(stRight);
+        card.appendChild(statusLine);
+      }
+
+      // buy-in
+      var buyinRow = document.createElement("div");
+      buyinRow.className = "buyin-row";
+      var lbl = document.createElement("span");
+      lbl.className = "lbl";
+      lbl.textContent = "バイイン ×" + p.buyins;
+      var amt = document.createElement("span");
+      amt.className = "amt";
+      amt.textContent = fmt(playerBuyinTotal(p));
+      var buyinStepper = makeStepper(p.buyins, function (v) {
+        var delta = v - p.buyins;
+        p.buyins = v;
+        p.stack = Math.max(0, p.stack + delta * state.buyinUnit);
+        p.buyinTotal = Math.max(0, (p.buyinTotal || 0) + delta * state.buyinUnit);
+        saveState();
+        renderAll();
+      });
+      buyinRow.appendChild(lbl);
+      buyinRow.appendChild(amt);
+      buyinRow.appendChild(buyinStepper);
+      card.appendChild(buyinRow);
+
+      // chip breakdown (reconciliation, collapsible)
+      var details = document.createElement("details");
+      details.className = "chip-detail";
+      details.open = !!openChipDetailIds[p.id];
+      details.addEventListener("toggle", function () {
+        if (details.open) openChipDetailIds[p.id] = true; else delete openChipDetailIds[p.id];
+      });
+      var summary = document.createElement("summary");
+      summary.textContent = "実際のチップ枚数（確認用）";
+      details.appendChild(summary);
+
+      var chipsList = document.createElement("div");
+      chipsList.className = "chips-list";
+      state.denoms.forEach(function (d) {
+        var count = p.chips[d.id] || 0;
+        var row = document.createElement("div");
+        row.className = "chip-row";
+        row.appendChild(makeChipDisc(d.color, "sm"));
+        var label = document.createElement("span");
+        label.className = "lbl";
+        label.textContent = state.currency + Number(d.value).toLocaleString("ja-JP");
+        row.appendChild(label);
+        var stepper = makeStepper(count, function (v) { p.chips[d.id] = v; saveState(); renderPlayers(); });
+        row.appendChild(stepper);
+        var sub = document.createElement("span");
+        sub.className = "sub";
+        sub.textContent = fmt(count * d.value);
+        row.appendChild(sub);
+        chipsList.appendChild(row);
+      });
+      details.appendChild(chipsList);
+
+      var syncRow = document.createElement("div");
+      syncRow.className = "sync-row";
+      var syncBtn = document.createElement("button");
+      syncBtn.className = "btn sm";
+      syncBtn.textContent = "この内訳をスタックに反映";
+      syncBtn.addEventListener("click", function () {
+        p.stack = playerChipTotal(p);
+        saveState();
+        renderAll();
+      });
+      syncRow.appendChild(syncBtn);
+      details.appendChild(syncRow);
+
+      card.appendChild(details);
+
+      // foot
+      var foot = document.createElement("div");
+      foot.className = "card-foot";
+      var stackBlock = document.createElement("div");
+      stackBlock.className = "foot-block";
+      var stackLbl = document.createElement("p");
+      stackLbl.className = "lbl";
+      stackLbl.textContent = "スタック";
+      var stackVal = document.createElement("p");
+      stackVal.className = "val";
+      stackVal.textContent = fmt(p.stack);
+      stackBlock.appendChild(stackLbl);
+      stackBlock.appendChild(stackVal);
+
+      var netBlock = document.createElement("div");
+      netBlock.className = "foot-block";
+      var netLbl = document.createElement("p");
+      netLbl.className = "lbl";
+      netLbl.textContent = "ネット";
+      var net = p.stack - playerBuyinTotal(p);
+      var netVal = document.createElement("p");
+      netVal.className = "val " + (net >= 0 ? "positive" : "negative");
+      netVal.textContent = (net > 0 ? "+" : "") + fmt(net);
+      netBlock.appendChild(netLbl);
+      netBlock.appendChild(netVal);
+
+      foot.appendChild(stackBlock);
+      foot.appendChild(netBlock);
+      card.appendChild(foot);
+
+      // remove
+      var removeBtn = document.createElement("button");
+      removeBtn.className = "icon-btn remove-player";
+      removeBtn.innerHTML = "✕ 退席";
+      removeBtn.style.width = "auto";
+      removeBtn.style.padding = "0 .4rem";
+      removeBtn.style.fontSize = ".75rem";
+      removeBtn.style.gap = ".3rem";
+      removeBtn.title = "この参加者を削除";
+      removeBtn.disabled = !!h;
+      removeBtn.addEventListener("click", function () {
+        if (state.hand) return;
+        state.players = state.players.filter(function (x) { return x.id !== p.id; });
+        if (state.dealerId === p.id) state.dealerId = null;
+        saveState();
+        renderAll();
+      });
+      card.insertBefore(removeBtn, card.firstChild);
+
+      els.players.appendChild(card);
+    });
+  }
+
+  function renderAll() {
+    renderHeader();
+    renderDenomTable();
+    renderHandPanel();
+    renderPlayers();
+  }
+
+  // ---------- showdown overlay ----------
+
+  function openShowdown() {
+    var h = state.hand;
+    els.winBanner.innerHTML = "";
+    els.potsArea.innerHTML = "";
+    els.nextHandRow.hidden = true;
+
+    if (h.resolved.fold) {
+      var winner = getPlayer(h.resolved.fold.winnerId);
+      var banner = document.createElement("div");
+      banner.className = "win-banner";
+      banner.textContent = winner.name + " の勝ち残りでポット " + fmt(h.resolved.fold.amount) + " を獲得しました。";
+      els.winBanner.appendChild(banner);
+      els.nextHandRow.hidden = false;
+      scheduleAutoNextHand();
+    } else {
+      renderShowdownRound();
+    }
+
+    els.showdownOverlay.hidden = false;
+  }
+
+  // Winner selection resolves one "round" at a time: pick the winner (or a
+  // tied group) once and every pot they're eligible for is awarded to them
+  // immediately. A pot only needs a separate round when a short all-in caps
+  // it below what a bigger stack contributed — the leftover then prompts
+  // again with just the remaining contenders, instead of asking pot-by-pot.
+  function unresolvedPots() {
+    return state.hand.resolved.pots.filter(function (pot) { return !pot.resolved; });
+  }
+
+  function renderShowdownRound() {
+    var h = state.hand;
+    els.potsArea.innerHTML = "";
+    var pending = unresolvedPots();
+
+    if (pending.length === 0) {
+      var done = document.createElement("p");
+      done.className = "pot-resolved";
+      done.textContent = "分配が完了しました。";
+      els.potsArea.appendChild(done);
+      els.nextHandRow.hidden = false;
+      scheduleAutoNextHand();
+      return;
+    }
+    els.nextHandRow.hidden = true;
+    cancelAutoNextHand();
+
+    var isFirstRound = pending.length === h.resolved.pots.length;
+    var totalPending = pending.reduce(function (s, pot) { return s + pot.amount; }, 0);
+    var poolIds = state.players.map(function (p) { return p.id; })
+      .filter(function (id) { return pending.some(function (pot) { return pot.eligibleIds.indexOf(id) !== -1; }); });
+
+    var block = document.createElement("div");
+    block.className = "pot-block";
+
+    var h3 = document.createElement("h3");
+    var titleSpan = document.createElement("span");
+    titleSpan.textContent = isFirstRound ? "勝者" : "残りのポットの勝者";
+    var amtSpan = document.createElement("span");
+    amtSpan.className = "amt";
+    amtSpan.textContent = fmt(totalPending);
+    h3.appendChild(titleSpan);
+    h3.appendChild(amtSpan);
+    block.appendChild(h3);
+
+    if (pending.length > 1) {
+      var breakdown = document.createElement("p");
+      breakdown.className = "eligible-note";
+      breakdown.textContent = pending.map(function (pot, i) {
+        return (i === 0 ? "メインポット " : "サイドポット" + i + " ") + fmt(pot.amount);
+      }).join(" ／ ");
+      block.appendChild(breakdown);
+    }
+
+    var selected = poolIds.length === 1 ? [poolIds[0]] : [];
+
+    var picks = document.createElement("div");
+    picks.className = "winner-picks";
+    var previewNote = document.createElement("p");
+    previewNote.className = "eligible-note";
+
+    function updatePreview() {
+      if (selected.length === 0) { previewNote.textContent = "同着（引き分け）の場合は複数選択できます。"; return; }
+      var covered = pending.filter(function (pot) {
+        return pot.eligibleIds.some(function (id) { return selected.indexOf(id) !== -1; });
+      });
+      var amount = covered.reduce(function (s, pot) { return s + pot.amount; }, 0);
+      var leftover = totalPending - amount;
+      previewNote.textContent = "この選択で " + fmt(amount) + " を獲得" + (leftover > 0 ? "（残り " + fmt(leftover) + " は次の勝者選択へ）" : "");
+    }
+
+    poolIds.forEach(function (id) {
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "winner-pick" + (selected.indexOf(id) !== -1 ? " selected" : "");
+      chip.textContent = getPlayer(id).name;
+      chip.addEventListener("click", function () {
+        var i = selected.indexOf(id);
+        if (i === -1) selected.push(id); else selected.splice(i, 1);
+        chip.classList.toggle("selected");
+        updatePreview();
+      });
+      picks.appendChild(chip);
+    });
+    block.appendChild(picks);
+    block.appendChild(previewNote);
+    updatePreview();
+
+    var confirmBtn = document.createElement("button");
+    confirmBtn.className = "btn primary sm";
+    confirmBtn.textContent = "確定して分配";
+    confirmBtn.addEventListener("click", function () {
+      if (selected.length === 0) return;
+      var touchedAmount = 0;
+      var touchedCount = 0;
+      pending.forEach(function (pot) {
+        var winners = pot.eligibleIds.filter(function (id) { return selected.indexOf(id) !== -1; });
+        if (winners.length === 0) return;
+        var share = Math.floor(pot.amount / winners.length);
+        var remainder = pot.amount - share * winners.length;
+        winners.forEach(function (id, i) { getPlayer(id).stack += share + (i === 0 ? remainder : 0); });
+        pot.winners = winners;
+        pot.resolved = true;
+        touchedAmount += pot.amount;
+        touchedCount++;
+      });
+      var names = selected.map(function (id) { return getPlayer(id).name; }).join("・");
+      log((touchedCount > 1 ? "複数ポット計 " : "ポット ") + fmt(touchedAmount) + " を " + names + " に分配");
+      saveState();
+      renderShowdownRound();
+      renderAll();
+    });
+    block.appendChild(confirmBtn);
+
+    els.potsArea.appendChild(block);
+  }
+
+  document.getElementById("closeShowdownBtn").addEventListener("click", function () { els.showdownOverlay.hidden = true; });
+  document.getElementById("nextHandBtn").addEventListener("click", triggerNextHand);
+  els.reopenShowdownBtn.addEventListener("click", function () { if (state.hand && state.hand.resolved) openShowdown(); });
+  els.showdownOverlay.addEventListener("click", function (e) { if (e.target === els.showdownOverlay) els.showdownOverlay.hidden = true; });
+
+  // ---------- events ----------
+
+  els.titleInput.addEventListener("input", function () {
+    state.title = els.titleInput.value;
+    saveState();
+    document.title = state.title || "チップ台帳";
+  });
+
+  els.currencyInput.addEventListener("input", function () { state.currency = els.currencyInput.value || "¥"; saveState(); renderAll(); });
+  els.buyinUnitInput.addEventListener("input", function () { state.buyinUnit = Math.max(0, Number(els.buyinUnitInput.value) || 0); saveState(); renderAll(); });
+  els.sbInput.addEventListener("input", function () { state.blinds.sb = Math.max(0, Number(els.sbInput.value) || 0); saveState(); });
+  els.bbInput.addEventListener("input", function () { state.blinds.bb = Math.max(0, Number(els.bbInput.value) || 0); saveState(); });
+  els.anteInput.addEventListener("input", function () { state.blinds.ante = Math.max(0, Number(els.anteInput.value) || 0); saveState(); });
+
+  document.getElementById("toggleSettingsBtn").addEventListener("click", function () { els.settingsPanel.hidden = !els.settingsPanel.hidden; });
+
+  document.getElementById("addDenomBtn").addEventListener("click", function () {
+    state.denoms.push({ id: uid("d"), label: "新規", value: 100, color: "#8a7238" });
+    saveState();
+    renderAll();
+  });
+
+  document.getElementById("addPlayerBtn").addEventListener("click", function () {
+    var chips = {};
+    state.denoms.forEach(function (d) { chips[d.id] = 0; });
+    var color = state.nextColorIndex < PLAYER_COLORS.length ? PLAYER_COLORS[state.nextColorIndex] : null;
+    state.nextColorIndex++;
+    state.players.push({ id: uid("p"), name: "プレイヤー" + (state.players.length + 1), buyins: 0, buyinTotal: 0, stack: 0, chips: chips, color: color });
+    saveState();
+    renderAll();
+  });
+
+  var resetBtn = document.getElementById("resetBtn");
+  var resetArmed = false, resetTimer = null;
+  resetBtn.addEventListener("click", function () {
+    if (!resetArmed) {
+      resetArmed = true;
+      resetBtn.textContent = "本当にリセット？";
+      resetTimer = setTimeout(function () { resetArmed = false; resetBtn.textContent = "リセット"; }, 3000);
+      return;
+    }
+    clearTimeout(resetTimer);
+    resetArmed = false;
+    resetBtn.textContent = "リセット";
+    state = clone(defaultState);
+    saveState();
+    renderAll();
+  });
+
+  document.getElementById("settleBtn").addEventListener("click", function () {
+    var t = tableTotals();
+    els.mismatchBanner.innerHTML = "";
+    if (t.diff !== 0) {
+      var banner = document.createElement("div");
+      banner.className = "mismatch-banner";
+      banner.textContent = "スタック合計とバイイン合計が一致していません（差額 " + fmt(t.diff) + "）。集計ミスがないか確認してください。";
+      els.mismatchBanner.appendChild(banner);
+    }
+    var transfers = computeSettlement();
+    els.transferArea.innerHTML = "";
+    if (transfers.length === 0) {
+      var note = document.createElement("p");
+      note.className = "settled-note";
+      note.textContent = "精算の必要はありません。";
+      els.transferArea.appendChild(note);
+    } else {
+      var list = document.createElement("div");
+      list.className = "transfer-list";
+      transfers.forEach(function (tr) {
+        var row = document.createElement("div");
+        row.className = "transfer";
+        var from = document.createElement("span"); from.className = "who from"; from.textContent = tr.from;
+        var arrow = document.createElement("span"); arrow.className = "arrow"; arrow.textContent = "→";
+        var to = document.createElement("span"); to.className = "who to"; to.textContent = tr.to;
+        var amount = document.createElement("span"); amount.className = "amt"; amount.textContent = fmt(tr.amount);
+        row.appendChild(from); row.appendChild(arrow); row.appendChild(to); row.appendChild(amount);
+        list.appendChild(row);
+      });
+      els.transferArea.appendChild(list);
+    }
+    els.settleOverlay.hidden = false;
+  });
+
+  document.getElementById("closeSettleBtn").addEventListener("click", function () { els.settleOverlay.hidden = true; });
+  els.settleOverlay.addEventListener("click", function (e) { if (e.target === els.settleOverlay) els.settleOverlay.hidden = true; });
+
+  els.startHandBtn.addEventListener("click", startHand);
+
+  var abortArmed = false, abortTimer = null;
+  document.getElementById("abortHandBtn").addEventListener("click", function (e) {
+    var btn = e.currentTarget;
+    if (!abortArmed) {
+      abortArmed = true;
+      btn.textContent = "本当に中止して掛け金を返却しますか？";
+      abortTimer = setTimeout(function () { abortArmed = false; btn.textContent = "ハンドを中止（掛け金を返却）"; }, 3000);
+      return;
+    }
+    clearTimeout(abortTimer);
+    abortArmed = false;
+    btn.textContent = "ハンドを中止（掛け金を返却）";
+    abortHand();
+  });
+
+  document.getElementById("cancelRaiseBtn").addEventListener("click", closeRaisePanel);
+
+  document.title = state.title || "チップ台帳";
+  renderAll();
+})();
+</script>
