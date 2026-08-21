@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>使い方ガイド | チップ台帳</title>
+<meta name="description" content="チップ台帳の使い方を解説。参加者登録・バイイン管理から、テキサスホールデムのハンド進行（ブラインド・ベット・フォールド・サイドポット精算）の操作方法まで、初めての方にもわかりやすく説明します。">
+<style>
+  :root {
+    --bg: #172420;
+    --bg-weave: #15211d;
+    --surface: #1e2b27;
+    --surface-2: #26352f;
+    --border: #3a4a43;
+    --text: #e5e0d3;
+    --text-dim: #98a69d;
+    --text-faint: #6f7b74;
+    --accent: #bfa06d;
+    --font-ui: "Hiragino Sans", "Yu Gothic", "YuGothic", "Noto Sans JP", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, #223530 0%, transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    line-height: 1.85;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 .6rem;
+  }
+  h1 { font-size: 1.9rem; margin: 0 0 .5rem; text-wrap: balance; }
+  .lede { color: var(--text-dim); font-size: 1rem; margin-bottom: 2.5rem; }
+  h2 {
+    font-size: 1.2rem;
+    margin-top: 2.6rem;
+    padding-bottom: .5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1rem; margin-top: 1.6rem; color: var(--accent); }
+  p, li { color: var(--text-dim); font-size: .95rem; }
+  strong { color: var(--text); }
+  ul, ol { padding-left: 1.4rem; }
+  li { margin-bottom: .4rem; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem 1.4rem;
+    margin: 1rem 0;
+  }
+  .card h3 { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }
+  th, td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--border); color: var(--text-dim); }
+  th { color: var(--text); font-weight: 600; }
+  .cta {
+    display: inline-block;
+    margin-top: 2.5rem;
+    background: var(--accent);
+    color: #231a0c;
+    font-weight: 700;
+    text-decoration: none;
+    padding: .8rem 1.6rem;
+    border-radius: 8px;
+  }
+  .back { display: block; margin-top: 1rem; color: var(--accent); text-decoration: none; font-size: .9rem; }
+  .back:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Home Game Guide</p>
+  <h1>チップ台帳の使い方</h1>
+  <p class="lede">「チップ台帳」は、友人同士の自宅ポーカー（ホームゲーム）で使えるチップ管理・精算アプリです。インストール不要、ブラウザだけで無料で使えます。このページでは、基本的な使い方をひと通り説明します。</p>
+
+  <h2>1. 卓の準備</h2>
+  <p>まず画面右上の「卓の設定」から、以下の項目を決めておきます。</p>
+  <ul>
+    <li><strong>通貨記号</strong>：円やチップの単位を自由に設定できます</li>
+    <li><strong>1回のバイイン額</strong>：参加者が最初に卓に出すチップの金額</li>
+    <li><strong>スモールブラインド／ビッグブラインド</strong>：テキサスホールデムで毎ハンド強制的に賭ける最低額</li>
+    <li><strong>BBアンティ</strong>：ビッグブラインドの位置の人が追加で払う金額（不要なら0でOK）</li>
+  </ul>
+  <p>「チップ構成」では、実際に使う物理チップの色と金額を登録できます。これは終盤の実数確認（後述）で使う補助機能です。</p>
+
+  <h2>2. 参加者を登録する</h2>
+  <p>「＋ 参加者を追加」で、卓に座る人数分プレイヤーを追加します。名前をタップすると編集できます。それぞれの名前には自動で識別色が割り当てられ、誰のカードか一目でわかるようになっています。</p>
+  <p>参加者ごとに「バイイン」の＋ボタンを押すと、設定した金額がその人のスタック（持ちチップ）に加算されます。追加でチップを買い足す（リバイ）ときも同じ操作です。</p>
+
+  <h2>3. ハンドを進行する</h2>
+  <p>参加者が2人以上そろったら、「ハンドを開始」を押します。ディーラーボタン・スモールブラインド・ビッグブラインドは毎回自動でローテーションします。</p>
+
+  <div class="card">
+    <h3>アクションの操作</h3>
+    <p>自分の番になると、画面下に操作パネルが表示されます。</p>
+    <table>
+      <tr><th>ボタン</th><th>できること</th></tr>
+      <tr><td>フォールド</td><td>その ハンドから降りる</td></tr>
+      <tr><td>チェック／コール</td><td>賭け金がなければチェック、あればその額をコールする</td></tr>
+      <tr><td>ベット・レイズ</td><td>金額を指定して賭ける・上乗せする（1/3・1/2・2/3・ポットのプリセットか、スライダーで自由な額を指定可能）</td></tr>
+    </table>
+    <p>オールイン（残りチップ全額を賭ける）は、ベット・レイズのスライダーを右端まで動かすことで指定できます。</p>
+  </div>
+
+  <p>プリフロップ→フロップ→ターン→リバーと自動で進行し、全員の手が出そろうとショーダウン（勝者決定）の画面に切り替わります。勝者を選ぶと、獲得できるポットへ自動的に反映されます。複数人のオールインで賭け金の上限が異なる場合は、サイドポットも自動で計算されます。</p>
+
+  <h2>4. 実際のチップとの照合</h2>
+  <p>各プレイヤーのカードにある「実際のチップ枚数（確認用）」を開くと、物理チップの色ごとの枚数を入力できます。数え終えたら「この内訳をスタックに反映」を押すと、アプリ上のスタックを実際の枚数に合わせて修正できます。</p>
+
+  <h2>5. 精算する</h2>
+  <p>ゲームが終わったら、画面上部の「精算する」を押します。各プレイヤーのバイイン合計と最終スタックから収支を計算し、「誰が誰にいくら払えばよいか」を最小の送金回数で自動計算して表示します。</p>
+
+  <h2>よくある質問</h2>
+  <h3>データはどこに保存されますか？</h3>
+  <p>すべてこのブラウザの中（localStorage）にのみ保存され、外部のサーバーには送信されません。他の端末やブラウザとは共有されないので、複数人で同時に使う場合は同じ端末・同じ画面を見ながら進める使い方を想定しています。</p>
+  <h3>ハンドの途中で操作を間違えました</h3>
+  <p>ハンドパネルの「ハンドを中止（掛け金を返却）」を押すと、そのハンドで賭けた分がそれぞれのスタックに払い戻され、最初からやり直せます（分配が確定した後は使えません）。</p>
+
+  <a class="cta" href="./index.html">チップ台帳を開く</a>
+  <a class="back" href="./index.html">← トップに戻る</a>
+</div>
+</body>
+</html>
