@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://hrau888.github.io/chip-ledger/sitemap.xml
+Sitemap: https://hrau888.github.io/sitemap.xml
