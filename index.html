@@ -490,10 +490,11 @@
   .status-line.acting-tag { color: var(--accent); border-color: var(--accent); }
 
   .buyin-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: .6rem;
+    justify-content: space-between;
+    gap: .4rem .7rem;
     background: var(--surface-2);
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-control);
@@ -506,6 +507,24 @@
     font-size: .95rem;
     text-align: right;
   }
+  .buyin-controls {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex: 1 1 100%;
+  }
+  .buyin-amount-input {
+    flex: 1;
+    min-width: 4.5rem;
+    background: var(--surface-3);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: .35rem .5rem;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .buyin-controls .icon-btn { border: 1px solid var(--border-soft); }
+  .buyin-controls .icon-btn[disabled] { opacity: .35; cursor: not-allowed; }
 
   details.chip-detail { font-size: .82rem; }
   details.chip-detail summary {
@@ -1126,6 +1145,7 @@
       var unit = typeof parsed.buyinUnit === "number" ? parsed.buyinUnit : defaultState.buyinUnit;
       parsed.players.forEach(function (p) {
         if (typeof p.buyinTotal !== "number") p.buyinTotal = (p.buyins || 0) * unit;
+        if (!Array.isArray(p.buyinHistory)) p.buyinHistory = [];
       });
       return parsed;
     } catch (e) {
@@ -1944,7 +1964,11 @@
         card.appendChild(statusLine);
       }
 
-      // buy-in
+      // buy-in — every buy-in (first and every rebuy) is a free-typed
+      // amount rather than a fixed unit, so odd amounts (100円単位など) are
+      // possible. p.buyinHistory records each amount paid, in order, so
+      // "取消" can undo exactly the most recent one instead of assuming a
+      // fixed unit — important now that amounts can differ buy-in to buy-in.
       var buyinRow = document.createElement("div");
       buyinRow.className = "buyin-row";
       var lbl = document.createElement("span");
@@ -1953,17 +1977,51 @@
       var amt = document.createElement("span");
       amt.className = "amt";
       amt.textContent = fmt(playerBuyinTotal(p));
-      var buyinStepper = makeStepper(p.buyins, function (v) {
-        var delta = v - p.buyins;
-        p.buyins = v;
-        p.stack = Math.max(0, p.stack + delta * state.buyinUnit);
-        p.buyinTotal = Math.max(0, (p.buyinTotal || 0) + delta * state.buyinUnit);
+      var controls = document.createElement("div");
+      controls.className = "buyin-controls";
+      var amountInput = document.createElement("input");
+      amountInput.type = "number";
+      amountInput.min = "0";
+      amountInput.step = "10";
+      amountInput.value = state.buyinUnit;
+      amountInput.className = "buyin-amount-input";
+      amountInput.setAttribute("aria-label", "バイイン額");
+      var undoBtn = document.createElement("button");
+      undoBtn.type = "button";
+      undoBtn.className = "icon-btn";
+      undoBtn.title = "直前のバイインを取り消す";
+      undoBtn.textContent = "−";
+      undoBtn.disabled = p.buyins === 0;
+      undoBtn.addEventListener("click", function () {
+        if (p.buyins === 0) return;
+        p.buyinHistory = p.buyinHistory || [];
+        var last = p.buyinHistory.length ? p.buyinHistory.pop() : state.buyinUnit;
+        p.buyins -= 1;
+        p.stack = Math.max(0, p.stack - last);
+        p.buyinTotal = Math.max(0, (p.buyinTotal || 0) - last);
         saveState();
         renderAll();
       });
+      var addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "btn sm";
+      addBtn.textContent = "＋ 追加";
+      addBtn.addEventListener("click", function () {
+        var amount = Math.max(0, Number(amountInput.value) || 0);
+        p.buyins += 1;
+        p.buyinHistory = p.buyinHistory || [];
+        p.buyinHistory.push(amount);
+        p.stack += amount;
+        p.buyinTotal = (p.buyinTotal || 0) + amount;
+        saveState();
+        renderAll();
+      });
+      controls.appendChild(amountInput);
+      controls.appendChild(undoBtn);
+      controls.appendChild(addBtn);
       buyinRow.appendChild(lbl);
       buyinRow.appendChild(amt);
-      buyinRow.appendChild(buyinStepper);
+      buyinRow.appendChild(controls);
       card.appendChild(buyinRow);
 
       // chip breakdown (reconciliation, collapsible)
@@ -2268,7 +2326,7 @@
     state.denoms.forEach(function (d) { chips[d.id] = 0; });
     var color = state.nextColorIndex < PLAYER_COLORS.length ? PLAYER_COLORS[state.nextColorIndex] : null;
     state.nextColorIndex++;
-    state.players.push({ id: uid("p"), name: "プレイヤー" + (state.players.length + 1), buyins: 0, buyinTotal: 0, stack: 0, chips: chips, color: color });
+    state.players.push({ id: uid("p"), name: "プレイヤー" + (state.players.length + 1), buyins: 0, buyinTotal: 0, buyinHistory: [], stack: 0, chips: chips, color: color });
     saveState();
     renderAll();
   });
