@@ -1241,7 +1241,7 @@
 
     var handPlayers = {};
     participants.forEach(function (p) {
-      handPlayers[p.id] = { inHand: true, allIn: false, betStreet: 0, totalContributed: 0 };
+      handPlayers[p.id] = { inHand: true, allIn: false, betStreet: 0, totalContributed: 0, dead: 0 };
     });
 
     state.dealerId = newDealer.id;
@@ -1294,6 +1294,7 @@
     var pay = Math.min(amount, pl.stack);
     pl.stack -= pay;
     hp.totalContributed += pay; // ante is dead money, not part of betStreet-to-call
+    hp.dead += pay; // ...and excluded from side-pot tier/eligibility math too — see computeSidePots
     if (pl.stack === 0) hp.allIn = true;
     if (pay > 0) log(pl.name + " がBBアンティ " + fmt(pay) + (pay < amount ? "（オールイン）" : "") + " を投稿");
   }
@@ -1444,9 +1445,19 @@
   // of spawning its own pot.
   function computeSidePots() {
     var h = state.hand;
+    // The BB ante is dead money: nobody else has to match it to stay in the
+    // hand, so it must NOT count toward a player's contribution when working
+    // out side-pot tiers — otherwise paying it makes that player look like
+    // the biggest bettor and wrongly caps everyone else out of the main pot
+    // (e.g. a player who called every street in full still gets excluded
+    // just because they never had an ante of their own to "catch up" to).
+    // It's added back into the main (lowest) pot afterward instead, since
+    // everyone still in the hand is equally entitled to share it.
     var all = Object.keys(h.players).map(function (id) {
-      return { id: id, amount: h.players[id].totalContributed, inHand: h.players[id].inHand, allIn: h.players[id].allIn };
+      var hp = h.players[id];
+      return { id: id, amount: hp.totalContributed - (hp.dead || 0), inHand: hp.inHand, allIn: hp.allIn };
     }).filter(function (c) { return c.amount > 0; });
+    var deadMoney = Object.keys(h.players).reduce(function (s, id) { return s + (h.players[id].dead || 0); }, 0);
 
     if (all.length === 0) return [];
 
@@ -1457,9 +1468,10 @@
 
     var pots = [];
     var prev = 0;
-    boundaries.forEach(function (level) {
+    boundaries.forEach(function (level, i) {
       var amount = 0;
       all.forEach(function (c) { amount += Math.max(0, Math.min(c.amount, level) - prev); });
+      if (i === 0) amount += deadMoney;
       var eligibleIds = all.filter(function (c) { return c.inHand && c.amount >= level; }).map(function (c) { return c.id; });
       if (amount > 0 && eligibleIds.length > 0) {
         pots.push({ amount: amount, eligibleIds: eligibleIds, winners: [], resolved: false });
