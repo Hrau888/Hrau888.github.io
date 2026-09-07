@@ -705,6 +705,7 @@
     color: var(--text-dim);
   }
   .winner-pick.selected { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-3)); }
+  .winner-pick.folded { opacity: .5; cursor: default; }
   .pot-resolved { font-size: .82rem; color: var(--accent); }
 
   .win-banner {
@@ -2017,6 +2018,20 @@
         chip.classList.toggle("selected");
         updatePreview();
       });
+      picks.appendChild(chip);
+    });
+
+    // Folded players can't win, so they're left out of poolIds above — but
+    // shown here (disabled) so it's clear they were excluded on purpose,
+    // not missing by mistake.
+    var foldedIds = state.players.map(function (p) { return p.id; })
+      .filter(function (id) { return h.players[id] && !h.players[id].inHand && h.players[id].totalContributed > 0; });
+    foldedIds.forEach(function (id) {
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "winner-pick folded";
+      chip.disabled = true;
+      chip.textContent = getPlayer(id).name + "（フォールド済み）";
       picks.appendChild(chip);
     });
     block.appendChild(picks);
