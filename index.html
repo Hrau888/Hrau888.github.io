@@ -736,6 +736,39 @@
     box-shadow: 0 -12px 30px -18px rgba(0,0,0,.8);
   }
   .action-bar[hidden] { display: none; }
+  .action-bar-status {
+    max-width: 1180px;
+    margin: 0 auto .6rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem .7rem;
+    flex-wrap: wrap;
+  }
+  .abs-pot {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: .85rem;
+    color: var(--accent-strong);
+    white-space: nowrap;
+  }
+  .abs-players { display: flex; gap: .35rem; flex-wrap: wrap; flex: 1; }
+  .abs-player {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    border-radius: 999px;
+    padding: .15rem .55rem;
+    font-size: .74rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .abs-player .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .abs-player.acting { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); font-weight: 700; }
+  .abs-player.allin { color: var(--negative); border-color: color-mix(in srgb, var(--negative) 40%, transparent); }
+
   .action-bar-inner {
     max-width: 1180px;
     margin: 0 auto;
@@ -917,6 +950,10 @@
 </div>
 
 <div class="action-bar" id="actionBar" hidden>
+  <div class="action-bar-status" id="actionBarStatus">
+    <span class="abs-pot" id="absPot">ポット ¥0</span>
+    <div class="abs-players" id="absPlayers"></div>
+  </div>
   <div class="action-bar-inner">
     <div class="action-bar-who">
       <span id="actingName">—</span>
@@ -1570,6 +1607,8 @@
     abortHandBtn: document.getElementById("abortHandBtn"),
     reopenShowdownBtn: document.getElementById("reopenShowdownBtn"),
     actionBar: document.getElementById("actionBar"),
+    absPot: document.getElementById("absPot"),
+    absPlayers: document.getElementById("absPlayers"),
     actingName: document.getElementById("actingName"),
     actingToCall: document.getElementById("actingToCall"),
     foldBtn: document.getElementById("foldBtn"),
@@ -1743,6 +1782,28 @@
     els.actionBar.hidden = false;
     els.actingName.textContent = pl.name + " の番";
     els.actingToCall.textContent = "スタック " + fmt(pl.stack) + (toCall > 0 ? " ／ コール " + fmt(toCall) : "");
+
+    // Always-visible while it's someone's turn — on mobile the action bar is
+    // often the only thing on screen (everything else has scrolled away), so
+    // it needs to carry the pot size and who's still contesting it on its own.
+    els.absPot.textContent = "ポット " + fmt(potRemaining());
+    els.absPlayers.innerHTML = "";
+    state.players.forEach(function (p) {
+      var phi = h.players[p.id];
+      if (!phi || !phi.inHand) return;
+      var chip = document.createElement("span");
+      chip.className = "abs-player" + (p.id === actingId ? " acting" : "") + (phi.allIn ? " allin" : "");
+      if (p.color) {
+        var dot = document.createElement("span");
+        dot.className = "dot";
+        dot.style.background = p.color;
+        chip.appendChild(dot);
+      }
+      var label = document.createElement("span");
+      label.textContent = p.name + (phi.allIn ? "（オールイン）" : "");
+      chip.appendChild(label);
+      els.absPlayers.appendChild(chip);
+    });
 
     els.checkCallBtn.className = "btn " + (toCall > 0 ? "call" : "check");
     els.checkCallBtn.textContent = toCall > 0 ? (callIsAllIn ? "オールイン " + fmt(pl.stack) : "コール " + fmt(toCall)) : "チェック";
