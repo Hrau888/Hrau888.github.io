@@ -846,6 +846,7 @@
     <div class="actions">
       <button class="btn primary" id="addPlayerBtn">＋ 参加者を追加</button>
       <button class="btn" id="toggleSettingsBtn">卓の設定</button>
+      <button class="btn" id="soundToggleBtn" aria-label="効果音のオン・オフ">🔊 音</button>
       <button class="btn" id="settleBtn">精算する</button>
       <button class="btn ghost danger" id="resetBtn">リセット</button>
     </div>
@@ -1001,6 +1002,76 @@
   // than reusing one — a 9th+ player falls back to the neutral border.
   var PLAYER_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
 
+  // ---------- sound ----------
+  // Short synthesized cues (no audio files) so the table stays a single
+  // dependency-free HTML file. Each action gets a distinct tone so a glance
+  // away from the screen still tells you what just happened.
+  var SOUND_KEY = "chip-ledger-sound";
+  var soundEnabled = (function () {
+    try { return localStorage.getItem(SOUND_KEY) !== "off"; } catch (e) { return true; }
+  })();
+  var audioCtx = null;
+  function ensureAudioCtx() {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!audioCtx) audioCtx = new Ctx();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+  function beep(freq, duration, opts) {
+    var ctx = ensureAudioCtx();
+    if (!ctx) return;
+    opts = opts || {};
+    var t0 = ctx.currentTime + (opts.delay || 0);
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = opts.type || "sine";
+    osc.frequency.setValueAtTime(freq, t0);
+    if (opts.slideTo) osc.frequency.exponentialRampToValueAtTime(opts.slideTo, t0 + duration);
+    var vol = opts.volume != null ? opts.volume : .15;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + .01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + .03);
+  }
+  function playSound(name) {
+    if (!soundEnabled) return;
+    switch (name) {
+      case "fold": beep(220, .12, { slideTo: 130, volume: .1 }); break;
+      case "check": beep(440, .07, { volume: .11 }); break;
+      case "call": beep(520, .08, { volume: .13 }); break;
+      case "raise":
+        beep(500, .07, { type: "square", volume: .09 });
+        beep(720, .09, { type: "square", volume: .09, delay: .06 });
+        break;
+      case "allin":
+        beep(300, .1, { type: "sawtooth", volume: .13 });
+        beep(620, .18, { type: "sawtooth", volume: .13, delay: .08 });
+        break;
+      case "turn": beep(880, .1, { volume: .09 }); break;
+      case "deal":
+        beep(660, .06, { type: "triangle", volume: .1 });
+        beep(880, .08, { type: "triangle", volume: .1, delay: .07 });
+        break;
+      case "showdown":
+        beep(440, .1, { type: "triangle", volume: .12 });
+        beep(660, .14, { type: "triangle", volume: .12, delay: .1 });
+        break;
+      case "win":
+        beep(523.25, .12, { volume: .13 });
+        beep(659.25, .12, { volume: .13, delay: .11 });
+        beep(783.99, .2, { volume: .13, delay: .22 });
+        break;
+    }
+  }
+  function setSoundEnabled(v) {
+    soundEnabled = v;
+    try { localStorage.setItem(SOUND_KEY, v ? "on" : "off"); } catch (e) { /* storage unavailable */ }
+  }
+
   function loadState() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -1037,6 +1108,7 @@
 
   var AUTO_NEXT_HAND_DELAY = 1800;
   var autoNextHandTimer = null;
+  var lastActingId = null;
 
   // renderPlayers() rebuilds every player card from scratch on every state
   // change, which would otherwise slam shut each player's <details> chip
@@ -1190,6 +1262,8 @@
     };
 
     log((participants.length === 2 ? "ヘッズアップ" : "新しいハンド") + " — ボタン: " + newDealer.name);
+    lastActingId = null;
+    playSound("deal");
 
     postBlind(sb.id, state.blinds.sb, "SB");
     postBlind(bb.id, state.blinds.bb, "BB");
@@ -1299,9 +1373,11 @@
     if (action === "fold") {
       hp.inHand = false;
       log(pl.name + " がフォールド");
+      playSound("fold");
     } else if (action === "check") {
       if (hp.betStreet !== h.currentBet) return;
       log(pl.name + " がチェック");
+      playSound("check");
     } else if (action === "call") {
       var need = h.currentBet - hp.betStreet;
       var pay = Math.min(need, pl.stack);
@@ -1310,6 +1386,7 @@
       hp.totalContributed += pay;
       if (pl.stack === 0) hp.allIn = true;
       log(pl.name + " がコール " + fmt(pay) + (hp.allIn ? "（オールイン）" : ""));
+      playSound(hp.allIn ? "allin" : "call");
     } else if (action === "bet") {
       var target = Math.max(hp.betStreet, Math.min(amount, hp.betStreet + pl.stack));
       var delta = target - hp.betStreet;
@@ -1322,8 +1399,10 @@
         h.minRaise = Math.max(h.bbUnit, target - h.currentBet);
         h.currentBet = target;
         log(pl.name + " がベット・レイズ " + fmt(target) + (hp.allIn ? "（オールイン）" : ""));
+        playSound(hp.allIn ? "allin" : "raise");
       } else {
         log(pl.name + " がコール " + fmt(delta) + (hp.allIn ? "（オールイン）" : ""));
+        playSound(hp.allIn ? "allin" : "call");
       }
     }
 
@@ -1350,6 +1429,7 @@
     log(winner.name + " が勝ち残り、ポット " + fmt(amount) + " を獲得");
     h.resolved = { fold: { winnerId: winnerId, amount: amount }, pots: [] };
     h.queue = [];
+    playSound("win");
     saveState();
     renderAll();
     openShowdown();
@@ -1398,6 +1478,7 @@
     h.queue = [];
     h.resolved = { fold: null, pots: computeSidePots() };
     log("— ショーダウン —");
+    playSound("showdown");
     saveState();
     renderAll();
     openShowdown();
@@ -1632,10 +1713,15 @@
     var h = state.hand;
     closeRaisePanel(); // never let it carry over from the previous player's turn
     if (!h || !h.queue[0] || h.resolved) {
+      lastActingId = null;
       els.actionBar.hidden = true;
       return;
     }
     var actingId = h.queue[0];
+    if (actingId !== lastActingId) {
+      if (lastActingId !== null) playSound("turn");
+      lastActingId = actingId;
+    }
     var pl = getPlayer(actingId);
     var hp = h.players[actingId];
     var toCall = Math.max(0, h.currentBet - hp.betStreet);
@@ -2058,6 +2144,7 @@
       });
       var names = selected.map(function (id) { return getPlayer(id).name; }).join("・");
       log((touchedCount > 1 ? "複数ポット計 " : "ポット ") + fmt(touchedAmount) + " を " + names + " に分配");
+      playSound("win");
       saveState();
       renderShowdownRound();
       renderAll();
@@ -2073,6 +2160,15 @@
   els.showdownOverlay.addEventListener("click", function (e) { if (e.target === els.showdownOverlay) els.showdownOverlay.hidden = true; });
 
   // ---------- events ----------
+
+  var soundToggleBtn = document.getElementById("soundToggleBtn");
+  function renderSoundToggle() { soundToggleBtn.textContent = soundEnabled ? "🔊 音" : "🔇 音"; }
+  renderSoundToggle();
+  soundToggleBtn.addEventListener("click", function () {
+    setSoundEnabled(!soundEnabled);
+    renderSoundToggle();
+    if (soundEnabled) playSound("check");
+  });
 
   els.titleInput.addEventListener("input", function () {
     state.title = els.titleInput.value;
