@@ -1609,6 +1609,7 @@
     bbInput: document.getElementById("bbInput"),
     anteInput: document.getElementById("anteInput"),
     denomTable: document.getElementById("denomTable"),
+    settleBtn: document.getElementById("settleBtn"),
     players: document.getElementById("players"),
     settleOverlay: document.getElementById("settleOverlay"),
     mismatchBanner: document.getElementById("mismatchBanner"),
@@ -1661,6 +1662,13 @@
     els.statChips.textContent = fmt(t.onTable);
     els.statDiff.textContent = fmt(t.diff);
     els.statDiff.className = "stat-value " + (t.diff === 0 ? "ok" : "warn");
+
+    // computeSettlement() only looks at stacks vs. buy-ins — money still
+    // sitting in a live pot isn't in anyone's stack yet, so settling while
+    // any is unresolved would silently treat it as never having existed.
+    var potLive = potRemaining() > 0;
+    els.settleBtn.disabled = potLive;
+    els.settleBtn.title = potLive ? "ハンドを終える（または中止する）までは精算できません" : "";
   }
 
   function renderDenomTable() {
@@ -2240,9 +2248,12 @@
 
     // Folded players can't win, so they're left out of poolIds above — but
     // shown here (disabled) so it's clear they were excluded on purpose,
-    // not missing by mistake.
+    // not missing by mistake. This includes a player who folded before ever
+    // contributing (e.g. a non-blind seat folding preflop before having to
+    // call) — being dealt into the hand and no longer inHand is enough to
+    // show them as folded, independent of how much (if anything) they paid.
     var foldedIds = state.players.map(function (p) { return p.id; })
-      .filter(function (id) { return h.players[id] && !h.players[id].inHand && h.players[id].totalContributed > 0; });
+      .filter(function (id) { return h.players[id] && !h.players[id].inHand; });
     foldedIds.forEach(function (id) {
       var chip = document.createElement("button");
       chip.type = "button";
@@ -2348,7 +2359,8 @@
     renderAll();
   });
 
-  document.getElementById("settleBtn").addEventListener("click", function () {
+  els.settleBtn.addEventListener("click", function () {
+    if (potRemaining() > 0) return; // guards the disabled state above
     var t = tableTotals();
     els.mismatchBanner.innerHTML = "";
     if (t.diff !== 0) {
