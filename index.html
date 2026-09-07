@@ -146,6 +146,7 @@
   .stat {
     background: var(--surface-2);
     padding: .7rem .9rem;
+    min-width: 0;
   }
   .stat-label {
     font-size: .68rem;
@@ -153,6 +154,7 @@
     text-transform: uppercase;
     color: var(--text-faint);
     margin: 0 0 .25rem;
+    overflow-wrap: anywhere;
   }
   .stat-value {
     font-family: var(--font-mono);
@@ -356,7 +358,9 @@
     flex-wrap: wrap;
     font-size: .82rem;
     color: var(--text-dim);
+    min-width: 0;
   }
+  .hand-meta span { min-width: 0; overflow-wrap: anywhere; }
   .hand-meta b { color: var(--text); }
   .hand-log {
     margin-top: .8rem;
@@ -782,7 +786,8 @@
     padding: .15rem .55rem;
     font-size: .74rem;
     color: var(--text-dim);
-    white-space: nowrap;
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
   .abs-player .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
   .abs-player.acting { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); font-weight: 700; }
@@ -1313,6 +1318,7 @@
       preflopOrderIds: preflopOrderIds,
       postflopOrderIds: postflopOrderIds,
       queue: [],
+      capped: false, // set once a short (under-minRaise) all-in closes off further raising this street
       players: handPlayers,
       log: [],
       resolved: null // { pots: [{amount, eligibleIds, winners, resolved}], fold: {winnerId} }
@@ -1406,6 +1412,7 @@
     Object.keys(h.players).forEach(function (id) { h.players[id].betStreet = 0; });
     h.currentBet = 0;
     h.minRaise = h.bbUnit;
+    h.capped = false;
 
     if (next === "showdown") {
       goToShowdown();
@@ -1454,7 +1461,18 @@
       if (pl.stack === 0) hp.allIn = true;
       if (target > h.currentBet) {
         isRaise = true;
-        h.minRaise = Math.max(h.bbUnit, target - h.currentBet);
+        var raiseSize = target - h.currentBet;
+        // A raise under the legal minimum (only possible when it's a short
+        // all-in) doesn't get to reopen full raising rights for players who
+        // already closed out this amount — real poker caps further raising
+        // for the rest of the street once that happens. minRaise is left as
+        // the last full-raise size (not shrunk to this short amount) since
+        // it's now moot for this street anyway.
+        if (raiseSize >= h.minRaise) {
+          h.minRaise = raiseSize;
+        } else {
+          h.capped = true;
+        }
         h.currentBet = target;
         log(pl.name + " がベット・レイズ " + fmt(target) + (hp.allIn ? "（オールイン）" : ""));
         playSound(hp.allIn ? "allin" : "raise");
@@ -1840,7 +1858,9 @@
 
     var minRaiseTo = h.currentBet + h.minRaise;
     var maxRaiseTo = hp.betStreet + pl.stack;
-    els.openRaiseBtn.disabled = maxRaiseTo <= h.currentBet; // can only call/all-in for less
+    // Also disabled once a short (under-minRaise) all-in has capped the
+    // street — real poker doesn't let anyone reopen raising after that.
+    els.openRaiseBtn.disabled = maxRaiseTo <= h.currentBet || h.capped;
     els.openRaiseBtn.onclick = function () {
       els.raisePanel.hidden = false;
       var lo = Math.min(minRaiseTo, maxRaiseTo);
@@ -1998,6 +2018,7 @@
       undoBtn.type = "button";
       undoBtn.className = "icon-btn";
       undoBtn.title = "直前のバイインを取り消す";
+      undoBtn.setAttribute("aria-label", "直前のバイインを取り消す");
       undoBtn.textContent = "−";
       undoBtn.disabled = p.buyins === 0;
       undoBtn.addEventListener("click", function () {
@@ -2069,7 +2090,14 @@
       var syncBtn = document.createElement("button");
       syncBtn.className = "btn sm";
       syncBtn.textContent = "この内訳をスタックに反映";
+      // Overwriting p.stack mid-hand would corrupt whatever the hand engine
+      // already has in play for this player (their betStreet/pot math still
+      // assumes the pre-sync stack) — same class of bug as settling mid-hand,
+      // fixed earlier this session. Only allow this between hands.
+      syncBtn.disabled = !!state.hand;
+      syncBtn.title = state.hand ? "ハンドを終える（または中止する）までは反映できません" : "";
       syncBtn.addEventListener("click", function () {
+        if (state.hand) return;
         p.stack = playerChipTotal(p);
         saveState();
         renderAll();
